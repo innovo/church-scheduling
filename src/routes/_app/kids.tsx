@@ -100,7 +100,7 @@ function KidsPage() {
       <PageHeader
         kicker="Kids Church"
         title="Check-in"
-        description="QR badges, pickup codes, and a printed roster for the rooms. Works with any Wi‑Fi printer via the browser."
+        description="QR badges, pickup codes, and a printed roster for check-in. Works with any Wi‑Fi printer via the browser."
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setWalkOpen(true)}>
@@ -127,7 +127,7 @@ function KidsPage() {
             <option key={s}>{s}</option>
           ))}
         </select>
-        <Badge tone="primary">{onSite.length} in rooms</Badge>
+        <Badge tone="primary">{onSite.length} checked in</Badge>
       </div>
 
       {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
@@ -211,7 +211,7 @@ function KidsPage() {
               {new Date().toLocaleDateString("en-ZA")} · Keep pickup codes at the desk, never on the child.
             </p>
             {Object.keys(byRoom).length === 0 ? (
-              <EmptyState title="Rooms are empty" description="Check children in from Register or by scanning a badge." />
+              <EmptyState title="No one checked in yet" description="Check children in from Register or by scanning a badge." />
             ) : (
               Object.entries(byRoom).map(([room, list]) => (
                 <section key={room} className="mb-6">

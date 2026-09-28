@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import { createFileRoute } from "@tanstack/react-router";
 import { Pause, Play, Trash2 } from "lucide-react";
 import { listSermons, deleteSermon, createSermon } from "@/lib/church/api";
-import { uploadAudio } from "@/lib/church/upload";
+import { uploadAudio, uploadImage } from "@/lib/church/upload";
 import { useMe } from "@/lib/church/me-context";
-import { imageSrc, type Sermon } from "@/lib/church/types";
+import { sermonImageSrc, type Sermon } from "@/lib/church/types";
 import { formatDay } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ function SermonsPage() {
             className="flex w-full items-center gap-4 overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]"
           >
             <button type="button" onClick={() => setCurrent(s)} className="flex flex-1 gap-4 text-left">
-              <img src={imageSrc(s.imageKey)} alt="" className="h-24 w-24 shrink-0 object-cover" />
+              <img src={sermonImageSrc(s)} alt="" className="h-24 w-24 shrink-0 object-cover" />
               <div className="py-3 pr-4">
                 <p className="text-xs text-muted">{s.series}</p>
                 <h2 className="font-display text-lg font-medium">{s.title}</h2>
@@ -110,7 +110,36 @@ function NewSermonDialog({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+
+  async function onPickImage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image is too large, max 8MB");
+      return;
+    }
+    setImageBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadImage({ data: { dataUrl, kind: "sermon" } });
+      setImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload image");
+    } finally {
+      setImageBusy(false);
+    }
+  }
 
   async function onPickAudio(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -154,11 +183,13 @@ function NewSermonDialog({
           preachedAt: String(fd.get("preachedAt")),
           description: String(fd.get("description") || ""),
           audioUrl,
+          imageUrl,
         },
       });
       onCreated();
       setAudioUrl(null);
       setAudioName(null);
+      setImageUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not add sermon");
     } finally {
@@ -173,6 +204,30 @@ function NewSermonDialog({
           <DialogTitle>New sermon</DialogTitle>
         </DialogHeader>
         <form className="space-y-3" onSubmit={onSubmit}>
+          <div className="space-y-1.5">
+            <Label>Image (optional, max 8MB)</Label>
+            <button
+              type="button"
+              onClick={() => imageInput.current?.click()}
+              disabled={imageBusy}
+              className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-input bg-surface text-sm text-muted"
+            >
+              {imageBusy ? (
+                "Uploading…"
+              ) : imageUrl ? (
+                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                "Tap to add an image, or leave blank for the default"
+              )}
+            </button>
+            <input
+              ref={imageInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={onPickImage}
+            />
+          </div>
           <div className="space-y-1.5">
             <Label>Voice recording (optional, max 60MB)</Label>
             <button
@@ -218,7 +273,7 @@ function NewSermonDialog({
             <Textarea id="description" name="description" />
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={busy || audioBusy}>
+          <Button type="submit" className="w-full" disabled={busy || audioBusy || imageBusy}>
             {busy ? "Saving…" : "Publish sermon"}
           </Button>
         </form>
@@ -254,7 +309,7 @@ function Player({ sermon }: { sermon: Sermon }) {
   return (
     <section className="overflow-hidden rounded-2xl bg-primary text-primary-fg">
       <div className="grid md:grid-cols-[18rem_1fr]">
-        <img src={imageSrc(sermon.imageKey)} alt="" className="h-48 w-full object-cover md:h-full" />
+        <img src={sermonImageSrc(sermon)} alt="" className="h-48 w-full object-cover md:h-full" />
         <div className="p-6">
           <Badge tone="warm">{sermon.series}</Badge>
           <h2 className="mt-3 font-display text-3xl font-medium">{sermon.title}</h2>

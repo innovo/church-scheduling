@@ -394,7 +394,7 @@ export async function seedIfNeeded(sql: Sql) {
 
   const teamNames = [
     { name: "Worship", ministry: "worship", desc: "Music, and the quiet work of helping us sing." },
-    { name: "Kids Church", ministry: "kids", desc: "Little Lights, the kids' rooms, and a church that feels like wonder." },
+    { name: "Kids Church", ministry: "kids", desc: "Little Lights, Kids Church, and a place that feels like wonder." },
     { name: "Hospitality", ministry: "hospitality", desc: "Doors, coffee, and first conversations." },
     { name: "Prayer", ministry: "prayer", desc: "The people who hold the rest of us when we cannot pray." },
     { name: "Media", ministry: "media", desc: "Sound, stories, and the recordings that travel further than Kimberley Street." },
@@ -503,7 +503,7 @@ export async function seedIfNeeded(sql: Sql) {
 
   await sql`
     insert into resources (title, url, category, description, kind) values
-    ('Child protection policy', '/resources#safeguarding', 'Policies', 'How we screen volunteers, run rooms, and handle disclosures.', 'policy'),
+    ('Child protection policy', '/resources#safeguarding', 'Policies', 'How we screen volunteers, run Kids Church, and handle disclosures.', 'policy'),
     ('Sunday volunteer handbook', '/resources#handbook', 'Policies', 'Doors, coffee, kids, and the changeover between gatherings.', 'document'),
     ('Giving FAQ', '/give', 'Finance', 'Funds, tax receipts, and how to give by EFT.', 'link'),
     ('Map & directions', ${"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("31 Kimberley Street, Townsend Estate, Goodwood, Cape Town")}, 'Practical', '31 Kimberley Street, Townsend Estate, Goodwood, Cape Town.', 'link'),

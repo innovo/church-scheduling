@@ -94,6 +94,7 @@ export function publicHappenings(): { events: ChurchEvent[]; sermon: Sermon } {
     durationSeconds: 1860,
     description: "A word on God's call to rise, shine, and awaken the nations to His presence and power.",
     imageKey: "arch",
+    imageUrl: null,
     transcript: "",
     audioUrl: null,
   };

@@ -8,17 +8,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 
-const MAX_BYTES: Record<"avatar" | "event" | "logo", number> = {
+const MAX_BYTES: Record<"avatar" | "event" | "logo" | "sermon", number> = {
   avatar: 4 * 1024 * 1024,
   event: 8 * 1024 * 1024,
   logo: 4 * 1024 * 1024,
+  sermon: 8 * 1024 * 1024,
 };
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export const uploadImage = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((d: { dataUrl: string; kind: "avatar" | "event" | "logo" }) => d)
+  .validator((d: { dataUrl: string; kind: "avatar" | "event" | "logo" | "sermon" }) => d)
   .handler(async ({ context, data }) => {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       throw new Error(

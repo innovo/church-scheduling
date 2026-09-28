@@ -173,9 +173,15 @@ export type Sermon = {
   durationSeconds: number;
   description: string;
   imageKey: string;
+  imageUrl: string | null;
   transcript: string;
   audioUrl: string | null;
 };
+
+/** An uploaded sermon image wins over the stock photo key. */
+export function sermonImageSrc(s: { imageUrl?: string | null; imageKey: string }) {
+  return s.imageUrl || imageSrc(s.imageKey);
+}
 
 export type Team = {
   id: number;

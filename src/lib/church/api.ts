@@ -119,6 +119,7 @@ function mapSermon(row: {
   duration_seconds: number;
   description: string;
   image_key: string;
+  image_url: string | null;
   transcript: string;
   audio_url: string | null;
 }): Sermon {
@@ -132,6 +133,7 @@ function mapSermon(row: {
     durationSeconds: row.duration_seconds,
     description: row.description,
     imageKey: row.image_key,
+    imageUrl: row.image_url ?? null,
     transcript: row.transcript,
     audioUrl: row.audio_url ?? null,
   };
@@ -543,6 +545,55 @@ export const createEvent = createServerFn({ method: "POST" })
     return { id: rows[0]!.id };
   });
 
+export const updateEvent = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (d: {
+      eventId: number;
+      title: string;
+      description: string;
+      location: string;
+      startsAt: string;
+      endsAt: string;
+      visibility: "public" | "members";
+      kind: string;
+      ticketCents: number;
+      capacity?: number;
+      imageKey?: string;
+      imageUrl?: string | null;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only staff can edit events");
+    const sql = await getSql();
+    await sql`
+      update events set
+        title = ${data.title.trim()}, description = ${data.description.trim()}, location = ${data.location.trim()},
+        starts_at = ${data.startsAt}, ends_at = ${data.endsAt}, visibility = ${data.visibility}, kind = ${data.kind},
+        capacity = ${data.capacity ?? null}, ticket_cents = ${Math.max(0, data.ticketCents | 0)},
+        image_key = ${data.imageKey || "sanctuary"}, image_url = ${data.imageUrl ?? null}
+      where id = ${data.eventId}
+    `;
+    return { ok: true as const };
+  });
+
+/** Every event, past and future, for the "view all" browser with sort/filter. */
+export const listAllEvents = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await loadMe(context.userId);
+    const sql = await getSql();
+    const rows = await sql<Parameters<typeof mapEvent>[0]>`
+      select e.*,
+        (select count(*)::int from event_registrations r where r.event_id = e.id and r.status = 'going') as going,
+        exists(select 1 from event_registrations r where r.event_id = e.id and r.user_id = ${context.userId} and r.status = 'going') as mine
+      from events e
+      order by e.starts_at desc
+    `;
+    return rows.map(mapEvent);
+  });
+
 export const deleteEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((eventId: number) => eventId)
@@ -588,6 +639,7 @@ export const createSermon = createServerFn({ method: "POST" })
       durationSeconds?: number;
       description?: string;
       imageKey?: string;
+      imageUrl?: string | null;
       transcript?: string;
       audioUrl?: string | null;
     }) => d,
@@ -598,11 +650,11 @@ export const createSermon = createServerFn({ method: "POST" })
     const sql = await getSql();
     const rows = await sql<{ id: number }>`
       insert into sermons (
-        title, speaker, series, scripture, preached_at, duration_seconds, description, image_key, transcript, audio_url
+        title, speaker, series, scripture, preached_at, duration_seconds, description, image_key, image_url, transcript, audio_url
       ) values (
         ${data.title.trim()}, ${data.speaker.trim()}, ${data.series?.trim() || ""}, ${data.scripture?.trim() || ""},
         ${data.preachedAt}, ${data.durationSeconds ?? 1800}, ${data.description?.trim() || ""},
-        ${data.imageKey || "scripture"}, ${data.transcript?.trim() || ""}, ${data.audioUrl ?? null}
+        ${data.imageKey || "music"}, ${data.imageUrl ?? null}, ${data.transcript?.trim() || ""}, ${data.audioUrl ?? null}
       ) returning id
     `;
     return { id: rows[0]!.id };

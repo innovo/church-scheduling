@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Trash2 } from "lucide-react";
-import { listEvents, createEvent, deleteEvent } from "@/lib/church/api";
+import { Pencil, Trash2 } from "lucide-react";
+import { listEvents, listAllEvents, createEvent, updateEvent, deleteEvent } from "@/lib/church/api";
 import { uploadImage } from "@/lib/church/upload";
 import { useMe } from "@/lib/church/me-context";
 import { eventImageSrc, type ChurchEvent } from "@/lib/church/types";
@@ -17,13 +17,22 @@ import { EmptyState } from "@/components/empty-state";
 
 export const Route = createFileRoute("/_app/events")({ component: EventsPage });
 
+const EVENT_KINDS = [
+  { id: "sunday", label: "Sunday" },
+  { id: "midweek", label: "Midweek" },
+  { id: "kids", label: "Kids" },
+  { id: "special", label: "Special" },
+];
+
 function EventsPage() {
   const me = useMe();
   const [events, setEvents] = useState<ChurchEvent[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ChurchEvent | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [allOpen, setAllOpen] = useState(false);
 
   function reload() {
     setEvents(null);
@@ -47,7 +56,7 @@ function EventsPage() {
   }
 
   async function onDelete(id: number) {
-    if (!window.confirm("Delete this event? This can't be undone.")) return;
+    if (!window.confirm("Are you sure you would like to delete this event? This can't be undone.")) return;
     setDeletingId(id);
     try {
       await deleteEvent({ data: id });
@@ -64,9 +73,12 @@ function EventsPage() {
         title="Events"
         description="Sundays, life together, and the nights we open the doors."
         actions={
-          me.isStaff ? (
-            <Button onClick={() => setOpen(true)}>New event</Button>
-          ) : null
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setAllOpen(true)}>
+              View all events
+            </Button>
+            {me.isStaff ? <Button onClick={() => setOpen(true)}>New event</Button> : null}
+          </div>
         }
       />
 
@@ -82,19 +94,33 @@ function EventsPage() {
           {events.map((ev) => (
             <div key={ev.id} className="relative overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]">
               {me.isStaff ? (
-                <button
-                  type="button"
-                  title="Delete event"
-                  disabled={deletingId === ev.id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onDelete(ev.id);
-                  }}
-                  className="absolute top-2 right-2 z-10 grid size-8 place-items-center rounded-full bg-black/50 text-white transition hover:bg-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+                  <button
+                    type="button"
+                    title="Edit event"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEditing(ev);
+                    }}
+                    className="grid size-8 place-items-center rounded-full bg-black/50 text-white transition hover:bg-primary"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete event"
+                    disabled={deletingId === ev.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDelete(ev.id);
+                    }}
+                    className="grid size-8 place-items-center rounded-full bg-black/50 text-white transition hover:bg-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
               ) : null}
               <Link to="/events/$eventId" params={{ eventId: String(ev.id) }} className="block">
                 <img src={eventImageSrc(ev)} alt="" className="h-40 w-full object-cover" />
@@ -123,32 +149,193 @@ function EventsPage() {
         </div>
       ) : null}
 
-      <CreateEventDialog
-        open={open}
-        onOpenChange={setOpen}
-        onCreated={() => {
+      <EventDialog
+        open={open || editing !== null}
+        event={editing}
+        onOpenChange={(v) => {
+          if (!v) {
+            setOpen(false);
+            setEditing(null);
+          }
+        }}
+        onSaved={() => {
           setOpen(false);
+          setEditing(null);
           reload();
         }}
+      />
+
+      <AllEventsDialog
+        open={allOpen}
+        onOpenChange={setAllOpen}
+        isStaff={me.isStaff}
+        onEdit={(ev) => {
+          setAllOpen(false);
+          setEditing(ev);
+        }}
+        onDeleted={reload}
       />
     </div>
   );
 }
 
-function CreateEventDialog({
+function AllEventsDialog({
   open,
   onOpenChange,
-  onCreated,
+  isStaff,
+  onEdit,
+  onDeleted,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated: () => void;
+  isStaff: boolean;
+  onEdit: (ev: ChurchEvent) => void;
+  onDeleted: () => void;
+}) {
+  const [events, setEvents] = useState<ChurchEvent[] | null>(null);
+  const [sort, setSort] = useState<"soonest" | "latest">("soonest");
+  const [type, setType] = useState<string>("all");
+  const [when, setWhen] = useState<"all" | "upcoming" | "past">("upcoming");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  function reload() {
+    listAllEvents().then(setEvents);
+  }
+  useEffect(() => {
+    if (open) reload();
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    if (!events) return [];
+    const now = Date.now();
+    let rows = events.filter((e) => (type === "all" ? true : e.kind === type));
+    if (when === "upcoming") rows = rows.filter((e) => new Date(e.startsAt).getTime() >= now);
+    if (when === "past") rows = rows.filter((e) => new Date(e.startsAt).getTime() < now);
+    rows = [...rows].sort((a, b) => {
+      const diff = new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+      return sort === "soonest" ? diff : -diff;
+    });
+    return rows;
+  }, [events, sort, type, when]);
+
+  async function onDelete(id: number) {
+    if (!window.confirm("Are you sure you would like to delete this event? This can't be undone.")) return;
+    setDeletingId(id);
+    try {
+      await deleteEvent({ data: id });
+      setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+      onDeleted();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>All events</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={when}
+            onChange={(e) => setWhen(e.target.value as typeof when)}
+            className="h-9 rounded-md border border-input bg-surface px-2 text-sm"
+          >
+            <option value="upcoming">Upcoming</option>
+            <option value="past">Past</option>
+            <option value="all">All dates</option>
+          </select>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="h-9 rounded-md border border-input bg-surface px-2 text-sm capitalize"
+          >
+            <option value="all">All types</option>
+            {EVENT_KINDS.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="h-9 rounded-md border border-input bg-surface px-2 text-sm"
+          >
+            <option value="soonest">Date: soonest first</option>
+            <option value="latest">Date: latest first</option>
+          </select>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {!events ? (
+            <div className="h-40 animate-pulse rounded-xl bg-bg-warm" />
+          ) : filtered.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No events match those filters.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {filtered.map((ev) => (
+                <li key={ev.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to="/events/$eventId"
+                      params={{ eventId: String(ev.id) }}
+                      onClick={() => onOpenChange(false)}
+                      className="font-medium hover:underline"
+                    >
+                      {ev.title}
+                    </Link>
+                    <p className="text-sm text-muted">
+                      {formatWhen(ev.startsAt)} · {ev.location}
+                    </p>
+                  </div>
+                  <Badge className="capitalize">{ev.kind}</Badge>
+                  {isStaff ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => onEdit(ev)}>
+                        Edit
+                      </Button>
+                      <button
+                        type="button"
+                        title="Delete event"
+                        disabled={deletingId === ev.id}
+                        onClick={() => onDelete(ev.id)}
+                        className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition hover:bg-destructive hover:text-white"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EventDialog({
+  open,
+  event,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean;
+  event: ChurchEvent | null;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setImageUrl(event?.imageUrl ?? null);
+  }, [event]);
 
   async function onPickImage(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -176,32 +363,44 @@ function CreateEventDialog({
     }
   }
 
+  function toLocalInput(iso: string) {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (event) {
+      if (!window.confirm("Are you sure you would like to implement these changes?")) return;
+    }
     const fd = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
     try {
       const starts = String(fd.get("starts"));
       const ends = String(fd.get("ends") || starts);
-      await createEvent({
-        data: {
-          title: String(fd.get("title")),
-          description: String(fd.get("description")),
-          location: String(fd.get("location")),
-          startsAt: new Date(starts).toISOString(),
-          endsAt: new Date(ends).toISOString(),
-          visibility: fd.get("visibility") === "public" ? "public" : "members",
-          kind: String(fd.get("kind") || "special"),
-          ticketCents: Math.round(Number(fd.get("price") || 0) * 100),
-          imageKey: "sanctuary",
-          imageUrl,
-        },
-      });
-      onCreated();
+      const data = {
+        title: String(fd.get("title")),
+        description: String(fd.get("description")),
+        location: String(fd.get("location")),
+        startsAt: new Date(starts).toISOString(),
+        endsAt: new Date(ends).toISOString(),
+        visibility: (fd.get("visibility") === "public" ? "public" : "members") as "public" | "members",
+        kind: String(fd.get("kind") || "special"),
+        ticketCents: Math.round(Number(fd.get("price") || 0) * 100),
+        imageKey: "sanctuary",
+        imageUrl,
+      };
+      if (event) {
+        await updateEvent({ data: { eventId: event.id, ...data } });
+      } else {
+        await createEvent({ data });
+      }
+      onSaved();
       setImageUrl(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create event");
+      setError(err instanceof Error ? err.message : "Could not save event");
     } finally {
       setBusy(false);
     }
@@ -211,9 +410,9 @@ function CreateEventDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New event</DialogTitle>
+          <DialogTitle>{event ? "Edit event" : "New event"}</DialogTitle>
         </DialogHeader>
-        <form className="space-y-3" onSubmit={onSubmit}>
+        <form className="space-y-3" onSubmit={onSubmit} key={event?.id ?? "new"}>
           <div className="space-y-1.5">
             <Label>Invitation image (optional, max 8MB)</Label>
             <button
@@ -240,24 +439,35 @@ function CreateEventDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" required />
+            <Input id="title" name="title" defaultValue={event?.title} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="description">Description</Label>
-            <Textarea id="description" name="description" required />
+            <Textarea id="description" name="description" defaultValue={event?.description} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="location">Location</Label>
-            <Input id="location" name="location" defaultValue="31 Kimberley Street, Townsend Estate, Goodwood" required />
+            <Input
+              id="location"
+              name="location"
+              defaultValue={event?.location ?? "31 Kimberley Street, Townsend Estate, Goodwood"}
+              required
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="starts">Starts</Label>
-              <Input id="starts" name="starts" type="datetime-local" required />
+              <Input
+                id="starts"
+                name="starts"
+                type="datetime-local"
+                defaultValue={event ? toLocalInput(event.startsAt) : undefined}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ends">Ends</Label>
-              <Input id="ends" name="ends" type="datetime-local" />
+              <Input id="ends" name="ends" type="datetime-local" defaultValue={event ? toLocalInput(event.endsAt) : undefined} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -266,6 +476,7 @@ function CreateEventDialog({
               <select
                 id="visibility"
                 name="visibility"
+                defaultValue={event?.visibility ?? "members"}
                 className="h-11 w-full rounded-md border border-input bg-surface px-3 text-sm"
               >
                 <option value="members">Members</option>
@@ -274,13 +485,34 @@ function CreateEventDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="price">Ticket (R, 0 = free)</Label>
-              <Input id="price" name="price" type="number" min={0} step="1" defaultValue={0} />
+              <Input
+                id="price"
+                name="price"
+                type="number"
+                min={0}
+                step="1"
+                defaultValue={event ? event.ticketCents / 100 : 0}
+              />
             </div>
           </div>
-          <input type="hidden" name="kind" value="special" />
+          <div className="space-y-1.5">
+            <Label htmlFor="kind">Type</Label>
+            <select
+              id="kind"
+              name="kind"
+              defaultValue={event?.kind ?? "special"}
+              className="h-11 w-full rounded-md border border-input bg-surface px-3 text-sm capitalize"
+            >
+              {EVENT_KINDS.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Saving…" : "Publish event"}
+            {busy ? "Saving…" : event ? "Save changes" : "Publish event"}
           </Button>
         </form>
       </DialogContent>

@@ -6,9 +6,11 @@ import { useMe } from "@/lib/church/me-context";
 import { FUNDS, type Contribution } from "@/lib/church/types";
 import { formatMoney } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { PaymentSettings } from "@/components/payment-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_app/give")({ component: GivePage });
 
@@ -27,6 +29,7 @@ function GivePage() {
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [gateways, setGateways] = useState<{ payfast: boolean; yoco: boolean } | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
 
   function reload() {
     myGiving().then((d) => {
@@ -101,6 +104,13 @@ function GivePage() {
         kicker="Stewardship"
         title="Give"
         description="We are a family that shares. Gifts are private unless you choose otherwise."
+        actions={
+          me.isAdmin ? (
+            <Button variant="outline" onClick={() => setConfigOpen(true)}>
+              Configure payment methods
+            </Button>
+          ) : null
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -251,6 +261,23 @@ function GivePage() {
           </p>
         </aside>
       </div>
+
+      {me.isAdmin ? (
+        <Dialog
+          open={configOpen}
+          onOpenChange={(v) => {
+            setConfigOpen(v);
+            if (!v) getActiveGateways().then(setGateways);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Payment methods</DialogTitle>
+            </DialogHeader>
+            <PaymentSettings />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

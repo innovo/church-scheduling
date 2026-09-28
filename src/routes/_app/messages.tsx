@@ -51,7 +51,7 @@ function MessagesPage() {
       <PageHeader
         kicker="Connect"
         title="Messages"
-        description="Channels for the whole church, your age group, and the teams you serve on. Not a second WhatsApp — a quieter room."
+        description="Channels for the whole church, your age group, and the teams you serve on. Not a second WhatsApp, a quieter room."
       />
       <div className="grid overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] lg:grid-cols-[16rem_1fr]">
         <aside className="border-b border-border lg:border-r lg:border-b-0">

@@ -178,7 +178,7 @@ function RosterBuilder({ teamId }: { teamId: number }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    listEvents().then((events) => {
+    listEvents({ data: undefined }).then(({ events }) => {
       const sundays = events.filter((e) => e.kind === "sunday");
       setSundayEvents(sundays);
       if (sundays[0]) setEventId(sundays[0].id);
@@ -229,7 +229,7 @@ function RosterBuilder({ teamId }: { teamId: number }) {
                 day: "numeric",
                 month: "short",
               })}
-              {" — "}
+              {" · "}
               {e.title}
             </option>
           ))}

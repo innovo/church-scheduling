@@ -17,6 +17,9 @@ export function mapPerson(row: {
   notes: string | null;
   qr_token: string;
   avatar_hue: number;
+  avatar_url?: string | null;
+  status?: string;
+  is_admin?: boolean;
 }): Person {
   return {
     id: row.id,
@@ -35,6 +38,9 @@ export function mapPerson(row: {
     notes: row.notes,
     qrToken: row.qr_token,
     avatarHue: row.avatar_hue,
+    avatarUrl: row.avatar_url ?? null,
+    status: (row.status as Person["status"]) ?? "approved",
+    isAdmin: row.is_admin ?? false,
   };
 }
 

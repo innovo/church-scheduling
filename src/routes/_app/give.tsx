@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { give, myGiving } from "@/lib/church/api";
+import { getActiveGateways, startPayfastPayment, startYocoPayment } from "@/lib/church/payments";
 import { useMe } from "@/lib/church/me-context";
 import { FUNDS, type Contribution } from "@/lib/church/types";
 import { formatMoney } from "@/lib/utils";
@@ -25,6 +26,7 @@ function GivePage() {
   const [totals, setTotals] = useState<{ fund: string; total: number }[]>([]);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [gateways, setGateways] = useState<{ payfast: boolean; yoco: boolean } | null>(null);
 
   function reload() {
     myGiving().then((d) => {
@@ -33,9 +35,46 @@ function GivePage() {
     });
   }
   useEffect(reload, []);
+  useEffect(() => {
+    getActiveGateways().then(setGateways);
+  }, []);
+
+  const hasRealGateway = Boolean(gateways?.payfast || gateways?.yoco);
+
+  async function payWith(gateway: "payfast" | "yoco") {
+    setBusy(true);
+    setDone(null);
+    try {
+      const payload = { amountCents: amount, fund, note: note || undefined, anonymous, recurring };
+      if (gateway === "payfast") {
+        const { action, fields } = await startPayfastPayment({ data: payload });
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = action;
+        for (const [name, value] of fields) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
+      const { url } = await startYocoPayment({ data: payload });
+      window.location.href = url;
+    } catch (err) {
+      setDone(err instanceof Error ? err.message : "Could not start payment");
+      setBusy(false);
+    }
+  }
 
   async function onGive(e: FormEvent) {
     e.preventDefault();
+    if (gateways?.payfast) return payWith("payfast");
+    if (gateways?.yoco) return payWith("yoco");
+    // Fallback while no gateway is enabled: record intent only.
     setBusy(true);
     setDone(null);
     try {
@@ -43,7 +82,7 @@ function GivePage() {
         data: { amountCents: amount, fund, method, note: note || undefined, anonymous, recurring },
       });
       setDone(
-        `Thank you. ${formatMoney(amount)} to ${FUNDS.find((f) => f.id === fund)?.label} is recorded. In production this step talks to PayFast, SnapScan, or Stripe.`,
+        `Thank you. ${formatMoney(amount)} to ${FUNDS.find((f) => f.id === fund)?.label} is recorded. Card payments aren't switched on yet, ask an admin to connect PayFast or Yoco in Admin settings.`,
       );
       setNote("");
       reload();
@@ -115,22 +154,24 @@ function GivePage() {
               ))}
             </div>
           </fieldset>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              ["card", "Card"],
-              ["eft", "EFT"],
-              ["snapscan", "SnapScan"],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setMethod(id)}
-                className={`h-11 rounded-md text-sm ${method === id ? "bg-primary text-primary-fg" : "bg-secondary"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {!hasRealGateway ? (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ["card", "Card"],
+                ["eft", "EFT"],
+                ["snapscan", "SnapScan"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setMethod(id)}
+                  className={`h-11 rounded-md text-sm ${method === id ? "bg-primary text-primary-fg" : "bg-secondary"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="note">Note (optional)</Label>
             <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -143,9 +184,30 @@ function GivePage() {
             <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
             Give without showing my name to staff
           </label>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Processing…" : `Give ${formatMoney(amount)}`}
-          </Button>
+          {gateways?.payfast && gateways?.yoco ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" className="w-full" disabled={busy} onClick={() => payWith("payfast")}>
+                {busy ? "Please wait…" : `Pay via PayFast`}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={busy}
+                onClick={() => payWith("yoco")}
+              >
+                {busy ? "Please wait…" : `Pay via Yoco`}
+              </Button>
+            </div>
+          ) : (
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy
+                ? "Please wait…"
+                : hasRealGateway
+                  ? `Give ${formatMoney(amount)} securely`
+                  : `Give ${formatMoney(amount)}`}
+            </Button>
+          )}
           {done ? <p className="text-sm text-muted">{done}</p> : null}
         </form>
 

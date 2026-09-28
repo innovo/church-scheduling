@@ -22,7 +22,7 @@ export const Route = createRootRoute({
       },
       {
         name: "description",
-        content: `${CHURCH_TAGLINE} A church in ${CHURCH_CITY} — members, teams, kids check-in, giving, and Sunday.`,
+        content: `${CHURCH_TAGLINE} A church in ${CHURCH_CITY}: members, teams, kids check-in, giving, and Sunday.`,
       },
       { name: "theme-color", content: "#0080FF" },
     ],

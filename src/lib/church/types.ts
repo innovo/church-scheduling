@@ -12,7 +12,7 @@ export const CHURCH_MAP =
   encodeURIComponent("31 Kimberley Street, Townsend Estate, Goodwood, Cape Town");
 export const CHURCH_WHATSAPP = "";
 export const CHURCH_VISION =
-  "A mandate to open apostolic and prophetic houses called Awake — carrying a prophetic sound to the Body of Christ and raising up the next generation, hub by hub, nation by nation.";
+  "A mandate to open apostolic and prophetic houses called Awake, carrying a prophetic sound to the Body of Christ and raising up the next generation, hub by hub, nation by nation.";
 
 export const LAUNCH_DATE = "2026-09-06";
 export const LAUNCH_TIMES = "08:30 or 10:30";
@@ -27,7 +27,7 @@ export const CHURCH_LEADERSHIP = [
 export const CORE_VALUES = [
   {
     title: "Being Made New",
-    body: "Jesus doesn’t just meet us once — he keeps changing us. There are no experts here, just people growing together.",
+    body: "Jesus doesn’t just meet us once, he keeps changing us. There are no experts here, just people growing together.",
   },
   {
     title: "Alive to His Spirit",
@@ -39,7 +39,7 @@ export const CORE_VALUES = [
   },
   {
     title: "Life Together",
-    body: "The church is most alive in homes and everyday relationships — known, supported, and formed together in Christ.",
+    body: "The church is most alive in homes and everyday relationships, known, supported, and formed together in Christ.",
   },
   {
     title: "So Others May Live",
@@ -47,7 +47,7 @@ export const CORE_VALUES = [
   },
   {
     title: "A Heart For The Next",
-    body: "Every person, of every age, should feel seen. We are especially focused on reaching and raising kids and teens.",
+    body: "Every person, of every age, should feel seen. We are especially focused on reaching and raising kids and youth.",
   },
   {
     title: "No Passengers",
@@ -61,7 +61,7 @@ export type Role = (typeof ROLES)[number];
 export const AGE_GROUPS = [
   { id: "little_ones", label: "Little Lights", ages: "0–2" },
   { id: "kids", label: "Kids Church", ages: "3–12" },
-  { id: "youth", label: "Teens", ages: "13–18" },
+  { id: "youth", label: "Youth", ages: "13–18" },
   { id: "young_adults", label: "Young adults", ages: "19–30" },
   { id: "adults", label: "Adults", ages: "31–55" },
   { id: "seniors", label: "Seniors", ages: "55+" },
@@ -72,7 +72,7 @@ export const FUNDS = [
   { id: "general", label: "General fund", blurb: "Sunday worship, staff, and the everyday life of the church." },
   { id: "missions", label: "Missions", blurb: "Local outreach and reaching the nations beyond our walls." },
   { id: "building", label: "Building", blurb: "Care of our home and the rooms still to come." },
-  { id: "kids", label: "Kids & teens", blurb: "Kids Church, teens, and a church that feels like wonder." },
+  { id: "kids", label: "Kids & youth", blurb: "Kids Church, youth, and a church that feels like wonder." },
 ] as const;
 
 export const IMAGE_KEYS = [
@@ -92,6 +92,11 @@ export function imageSrc(key: string) {
   return `/images/${safe}.jpg`;
 }
 
+/** An uploaded image (event invitation, etc.) wins over the stock photo key. */
+export function eventImageSrc(ev: { imageUrl?: string | null; imageKey: string }) {
+  return ev.imageUrl || imageSrc(ev.imageKey);
+}
+
 export type Person = {
   id: number;
   userId: string | null;
@@ -109,6 +114,9 @@ export type Person = {
   notes: string | null;
   qrToken: string;
   avatarHue: number;
+  avatarUrl: string | null;
+  status: "pending" | "approved" | "declined";
+  isAdmin: boolean;
 };
 
 export type Me = Person & {
@@ -139,20 +147,9 @@ export type ChurchEvent = {
   capacity: number | null;
   ticketCents: number;
   imageKey: string;
+  imageUrl: string | null;
   going: number;
   mine: boolean;
-};
-
-export type NewsPost = {
-  id: number;
-  title: string;
-  excerpt: string;
-  body: string;
-  authorName: string;
-  publishedAt: string;
-  pinned: boolean;
-  audience: string;
-  imageKey: string;
 };
 
 export type Sermon = {

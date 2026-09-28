@@ -55,7 +55,7 @@ function ResourcesPage() {
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted">
           <li>Every Kids Church volunteer is screened and trained before they hold a room.</li>
           <li>Two adults in every room. Doors with glass. No one-to-one closed spaces.</li>
-          <li>Pickup requires the code issued at check-in — never a badge worn by the child.</li>
+          <li>Pickup requires the code issued at check-in, never a badge worn by the child.</li>
           <li>Disclosures go to the safeguarding lead the same day. Do not investigate alone.</li>
         </ol>
       </section>

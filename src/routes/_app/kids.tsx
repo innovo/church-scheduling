@@ -229,7 +229,7 @@ function KidsPage() {
                       {list.map((c) => (
                         <tr key={c.id} className="border-t border-border">
                           <td className="py-2">{c.childName}</td>
-                          <td className="py-2">{c.allergies || "—"}</td>
+                          <td className="py-2">{c.allergies || "None"}</td>
                           <td className="py-2 font-mono tracking-widest">{c.pickupCode}</td>
                           <td className="py-2 print:hidden">
                             <Button size="sm" variant="outline" onClick={() => onOut(c.id, c.pickupCode)}>

@@ -20,7 +20,7 @@ function GroupsPage() {
       <PageHeader
         kicker="Formation"
         title="Groups & midweek"
-        description="Homes, teens, and the tables where most of the church actually happens."
+        description="Homes, youth, and the tables where most of the church actually happens."
       />
       <div className="grid gap-4 md:grid-cols-2">
         {groups.map((g) => (

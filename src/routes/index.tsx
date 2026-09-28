@@ -15,6 +15,7 @@ import {
   CORE_VALUES,
   SUNDAY_TIME,
   imageSrc,
+  eventImageSrc,
 } from "@/lib/church/types";
 import { Button } from "@/components/ui/button";
 import { NovaMark } from "@/components/nova-mark";
@@ -32,7 +33,7 @@ function Landing() {
     <main className="bg-bg text-fg">
       <header className="flex items-center justify-between px-5 py-5 md:px-10">
         <Link to="/" className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-fg">
+          <span className="grid size-9 place-items-center rounded-md bg-white shadow-sm ring-1 ring-black/5">
             <NovaMark />
           </span>
           <span className="font-display text-xl leading-none">{CHURCH_NAME}</span>
@@ -60,7 +61,7 @@ function Landing() {
             {CHURCH_TAGLINE}
           </h1>
           <p className="mt-3 max-w-lg text-sm text-primary-fg/85 sm:text-base">
-            An Awake house in {CHURCH_CITY} — worshipping together, growing together, and reaching the
+            An Awake house in {CHURCH_CITY}, worshipping together, growing together, and reaching the
             nations.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
@@ -109,7 +110,7 @@ function Landing() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {events.map((ev) => (
             <article key={ev.id} className="overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]">
-              <img src={imageSrc(ev.imageKey)} alt="" className="h-40 w-full object-cover" />
+              <img src={eventImageSrc(ev)} alt="" className="h-40 w-full object-cover" />
               <div className="p-5">
                 <h3 className="font-display text-xl font-medium">{ev.title}</h3>
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">

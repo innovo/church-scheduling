@@ -9,7 +9,6 @@ import {
   personName,
   type Me,
   type ChurchEvent,
-  type NewsPost,
   type Sermon,
   type Team,
   type Group,
@@ -42,16 +41,22 @@ async function loadMe(
   }
 
   const signedIn = await sql<{ n: number }>`select count(*)::int as n from people where user_id is not null`;
-  const role = (signedIn[0]?.n ?? 0) === 0 ? "pastor" : "member";
+  const isFirstEver = (signedIn[0]?.n ?? 0) === 0;
+  const role = isFirstEver ? "pastor" : "member";
+  // The very first account ever created (Zion/Amy standing the church up)
+  // is auto-approved and made admin. Everyone after that starts pending
+  // until a pastor/admin approves them (see the People/Approvals screen).
+  const status = isFirstEver ? "approved" : "pending";
+  const isAdmin = isFirstEver;
   const { first, last } = splitName(hint?.name ?? null, hint?.email ?? null);
   const hh = await sql<{ id: number }>`insert into households (name) values (${last || first}) returning id`;
   const qr = token();
   const hue = Math.floor(Math.random() * 360);
   const rows = await sql<PersonRow>`
     insert into people (
-      user_id, household_id, first_name, last_name, email, role, age_group, qr_token, avatar_hue
+      user_id, household_id, first_name, last_name, email, role, age_group, qr_token, avatar_hue, status, is_admin
     ) values (
-      ${userId}, ${hh[0]!.id}, ${first}, ${last}, ${hint?.email ?? null}, ${role}, ${"adults"}, ${qr}, ${hue}
+      ${userId}, ${hh[0]!.id}, ${first}, ${last}, ${hint?.email ?? null}, ${role}, ${"adults"}, ${qr}, ${hue}, ${status}, ${isAdmin}
     ) returning *`;
   const p = mapPerson(rows[0]!);
 
@@ -84,6 +89,7 @@ function mapEvent(
     capacity: number | null;
     ticket_cents: number;
     image_key: string;
+    image_url?: string | null;
     going: number;
     mine: boolean | number | null;
   },
@@ -100,32 +106,9 @@ function mapEvent(
     capacity: row.capacity,
     ticketCents: row.ticket_cents,
     imageKey: row.image_key,
+    imageUrl: row.image_url ?? null,
     going: Number(row.going) || 0,
     mine: Boolean(row.mine),
-  };
-}
-
-function mapNews(row: {
-  id: number;
-  title: string;
-  excerpt: string;
-  body: string;
-  author_name: string;
-  published_at: string;
-  pinned: boolean;
-  audience: string;
-  image_key: string;
-}): NewsPost {
-  return {
-    id: row.id,
-    title: row.title,
-    excerpt: row.excerpt,
-    body: row.body,
-    authorName: row.author_name,
-    publishedAt: row.published_at,
-    pinned: row.pinned,
-    audience: row.audience,
-    imageKey: row.image_key,
   };
 }
 
@@ -157,7 +140,7 @@ function mapSermon(row: {
 
 function roomForAge(ageGroup: string) {
   if (ageGroup === "little_ones") return "Little Lights";
-  if (ageGroup === "youth") return "Teens";
+  if (ageGroup === "youth") return "Youth";
   return "Kids Church";
 }
 
@@ -197,9 +180,6 @@ export const getHome = createServerFn({ method: "POST" })
       order by e.starts_at asc
       limit 5
     `;
-    const news = await sql<Parameters<typeof mapNews>[0]>`
-      select * from news order by pinned desc, published_at desc limit 4
-    `;
     const sermon = await sql<Parameters<typeof mapSermon>[0]>`
       select * from sermons order by preached_at desc limit 1
     `;
@@ -210,7 +190,7 @@ export const getHome = createServerFn({ method: "POST" })
     `;
     const giving = await sql<{ total: number }>`
       select coalesce(sum(amount_cents), 0)::int as total
-      from contributions where user_id = ${context.userId}
+      from contributions where user_id = ${context.userId} and status = 'paid'
     `;
     const kidsToday = await sql<{ n: number }>`
       select count(*)::int as n from checkins
@@ -222,7 +202,6 @@ export const getHome = createServerFn({ method: "POST" })
     return {
       me,
       events: events.map(mapEvent),
-      news: news.map(mapNews),
       sermon: sermon[0] ? mapSermon(sermon[0]) : null,
       teams: myTeams.map((t) => t.name),
       givenCents: giving[0]?.total ?? 0,
@@ -247,6 +226,7 @@ export const updateProfile = createServerFn({ method: "POST" })
       ageGroup?: string;
       birthday?: string;
       address?: string;
+      avatarUrl?: string | null;
     }) => d,
   )
   .handler(async ({ context, data }) => {
@@ -259,7 +239,8 @@ export const updateProfile = createServerFn({ method: "POST" })
         bio = ${data.bio?.trim() || null},
         age_group = ${data.ageGroup || "adults"},
         birthday = ${data.birthday || null},
-        address = ${data.address?.trim() || null}
+        address = ${data.address?.trim() || null},
+        avatar_url = coalesce(${data.avatarUrl ?? null}, avatar_url)
       where user_id = ${context.userId}
     `;
     return loadMe(context.userId);
@@ -271,16 +252,75 @@ export const listPeople = createServerFn({ method: "GET" })
     await loadMe(context.userId);
     const sql = await getSql();
     const rows = await sql<PersonRow>`
-      select * from people where role <> 'child' order by last_name, first_name
+      select * from people where role <> 'child' and status = 'approved' order by last_name, first_name
     `;
     return rows.map(mapPerson);
   });
 
-export const listEvents = createServerFn({ method: "GET" })
+function assertAdmin(me: Me) {
+  if (!me.isAdmin) throw new Error("Only admins can do that");
+}
+
+/** Everyone (any status), for the admin People/Approvals screen. */
+export const listPeopleForAdmin = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    const me = await loadMe(context.userId);
+    assertAdmin(me);
+    const sql = await getSql();
+    const rows = await sql<PersonRow>`
+      select * from people
+      order by (status = 'pending') desc, (user_id is null) asc, last_name, first_name
+    `;
+    return rows.map(mapPerson);
+  });
+
+export const setPersonStatus = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { personId: number; status: "approved" | "declined" | "pending" }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    assertAdmin(me);
+    const sql = await getSql();
+    await sql`update people set status = ${data.status} where id = ${data.personId}`;
+    return { ok: true as const };
+  });
+
+export const setPersonRole = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { personId: number; role: string }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    assertAdmin(me);
+    const sql = await getSql();
+    await sql`update people set role = ${data.role} where id = ${data.personId}`;
+    return { ok: true as const };
+  });
+
+export const setPersonAdmin = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { personId: number; isAdmin: boolean }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    assertAdmin(me);
+    const sql = await getSql();
+    if (data.isAdmin) {
+      const target = await sql<{ user_id: string | null }>`select user_id from people where id = ${data.personId}`;
+      if (!target[0]?.user_id) throw new Error("This person doesn't have a login yet, so they can't be made an admin");
+    }
+    await sql`update people set is_admin = ${data.isAdmin} where id = ${data.personId}`;
+    return { ok: true as const };
+  });
+
+const EVENTS_PAGE_SIZE = 20;
+
+export const listEvents = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((d: { offset?: number } | undefined) => d)
+  .handler(async ({ context, data }) => {
     await loadMe(context.userId);
     const sql = await getSql();
+    const offset = Math.max(0, data?.offset ?? 0);
     const rows = await sql<Parameters<typeof mapEvent>[0]>`
       select e.*,
         (select count(*)::int from event_registrations r where r.event_id = e.id and r.status = 'going') as going,
@@ -288,8 +328,10 @@ export const listEvents = createServerFn({ method: "GET" })
       from events e
       where e.starts_at > now() - interval '1 day'
       order by e.starts_at asc
+      limit ${EVENTS_PAGE_SIZE + 1} offset ${offset}
     `;
-    return rows.map(mapEvent);
+    const hasMore = rows.length > EVENTS_PAGE_SIZE;
+    return { events: rows.slice(0, EVENTS_PAGE_SIZE).map(mapEvent), hasMore };
   });
 
 export const getEvent = createServerFn({ method: "GET" })
@@ -374,6 +416,7 @@ export const createEvent = createServerFn({ method: "POST" })
       ticketCents: number;
       capacity?: number;
       imageKey?: string;
+      imageUrl?: string | null;
     }) => d,
   )
   .handler(async ({ context, data }) => {
@@ -382,42 +425,27 @@ export const createEvent = createServerFn({ method: "POST" })
     const sql = await getSql();
     const rows = await sql<{ id: number }>`
       insert into events (
-        title, description, location, starts_at, ends_at, visibility, kind, capacity, ticket_cents, image_key, created_by_user_id
+        title, description, location, starts_at, ends_at, visibility, kind, capacity, ticket_cents, image_key, image_url, created_by_user_id
       ) values (
         ${data.title.trim()}, ${data.description.trim()}, ${data.location.trim()},
         ${data.startsAt}, ${data.endsAt}, ${data.visibility}, ${data.kind},
-        ${data.capacity ?? null}, ${Math.max(0, data.ticketCents | 0)}, ${data.imageKey || "sanctuary"}, ${context.userId}
+        ${data.capacity ?? null}, ${Math.max(0, data.ticketCents | 0)}, ${data.imageKey || "sanctuary"},
+        ${data.imageUrl ?? null}, ${context.userId}
       ) returning id
     `;
     return { id: rows[0]!.id };
   });
 
-export const listNews = createServerFn({ method: "GET" })
+export const deleteEvent = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    await loadMe(context.userId);
-    const sql = await getSql();
-    const rows = await sql<Parameters<typeof mapNews>[0]>`
-      select * from news order by pinned desc, published_at desc
-    `;
-    return rows.map(mapNews);
-  });
-
-export const postNews = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((d: { title: string; body: string; audience?: string }) => d)
-  .handler(async ({ context, data }) => {
+  .validator((eventId: number) => eventId)
+  .handler(async ({ context, data: eventId }) => {
     const me = await loadMe(context.userId);
-    if (!me.isStaff) throw new Error("Only staff can post news");
+    if (!me.isStaff) throw new Error("Only staff can delete events");
     const sql = await getSql();
-    const excerpt = data.body.trim().slice(0, 160);
-    await sql`
-      insert into news (title, excerpt, body, author_name, author_user_id, audience, image_key)
-      values (
-        ${data.title.trim()}, ${excerpt}, ${data.body.trim()}, ${me.displayName}, ${context.userId},
-        ${data.audience || "all"}, ${"arch"}
-      )
-    `;
+    await sql`delete from event_registrations where event_id = ${eventId}`;
+    await sql`delete from roster_slots where event_id = ${eventId}`;
+    await sql`delete from events where id = ${eventId}`;
     return { ok: true as const };
   });
 
@@ -428,6 +456,17 @@ export const listSermons = createServerFn({ method: "GET" })
     const sql = await getSql();
     const rows = await sql<Parameters<typeof mapSermon>[0]>`select * from sermons order by preached_at desc`;
     return rows.map(mapSermon);
+  });
+
+export const deleteSermon = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((sermonId: number) => sermonId)
+  .handler(async ({ context, data: sermonId }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only staff can delete sermons");
+    const sql = await getSql();
+    await sql`delete from sermons where id = ${sermonId}`;
+    return { ok: true as const };
   });
 
 export const listTeams = createServerFn({ method: "GET" })
@@ -763,12 +802,12 @@ export const myGiving = createServerFn({ method: "GET" })
     }>`
       select id, amount_cents, fund, method, note, anonymous, recurring, created_at
       from contributions
-      where user_id = ${context.userId}
+      where user_id = ${context.userId} and status = 'paid'
       order by created_at desc
     `;
     const totals = me.isStaff
       ? await sql<{ fund: string; total: number }>`
-          select fund, sum(amount_cents)::int as total from contributions group by fund
+          select fund, sum(amount_cents)::int as total from contributions where status = 'paid' group by fund
         `
       : [];
     const history: Contribution[] = rows.map((r) => ({
@@ -840,10 +879,10 @@ export const registerChild = createServerFn({ method: "POST" })
     const hh = data.walkIn ? null : me.householdId;
     const rows = await sql<{ id: number; qr_token: string }>`
       insert into people (
-        household_id, first_name, last_name, role, age_group, birthday, allergies, notes, qr_token, avatar_hue
+        household_id, first_name, last_name, role, age_group, birthday, allergies, notes, qr_token, avatar_hue, status
       ) values (
         ${hh}, ${data.firstName.trim()}, ${data.lastName.trim()}, ${"child"}, ${roleAge},
-        ${birthday}, ${data.allergies?.trim() || null}, ${data.walkIn ? "Walk-in" : null}, ${token()}, ${Math.floor(Math.random() * 360)}
+        ${birthday}, ${data.allergies?.trim() || null}, ${data.walkIn ? "Walk-in" : null}, ${token()}, ${Math.floor(Math.random() * 360)}, ${"approved"}
       ) returning id, qr_token
     `;
     return { id: rows[0]!.id, qrToken: rows[0]!.qr_token };

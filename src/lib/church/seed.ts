@@ -200,7 +200,7 @@ export async function seedIfNeeded(sql: Sql) {
       household: 5,
       email: "daniel@example.com",
       phone: "",
-      bio: "Teens. Midweek gatherings are his favourite hour.",
+      bio: "Youth. Midweek gatherings are his favourite hour.",
       birthday: "1998-12-01",
       hue: 190,
     },
@@ -264,7 +264,7 @@ export async function seedIfNeeded(sql: Sql) {
   const sun3 = sast(nextSunday(2), 9, 30);
   const prayer = sast(nextSunday(0), 18, 30);
   const homes = sast(nextSunday(1), 19, 0);
-  const teens = sast(nextSunday(1), 18, 30);
+  const youth = sast(nextSunday(1), 18, 30);
 
   const eventRows = [
     {
@@ -296,7 +296,7 @@ export async function seedIfNeeded(sql: Sql) {
     {
       title: "Life together",
       description:
-        "The church is most alive in homes. A midweek table for people learning to belong — no performance, just presence.",
+        "The church is most alive in homes. A midweek table for people learning to belong, with no performance, just presence.",
       location: "Homes across Goodwood",
       starts: homes,
       ends: plusMinutes(homes, 120),
@@ -307,12 +307,12 @@ export async function seedIfNeeded(sql: Sql) {
       img: "study",
     },
     {
-      title: "Teens",
+      title: "Youth",
       description:
-        "Teens gather in the main meeting on Sunday, and connect through the week. Games, honesty, and a short word.",
-      location: "The teens room",
-      starts: teens,
-      ends: plusMinutes(teens, 120),
+        "Youth gather in the main meeting on Sunday, and connect through the week. Games, honesty, and a short word.",
+      location: "The youth room",
+      starts: youth,
+      ends: plusMinutes(youth, 120),
       vis: "members",
       kind: "kids",
       cap: 40,
@@ -357,27 +357,6 @@ export async function seedIfNeeded(sql: Sql) {
   }
 
   await sql`
-    insert into news (title, excerpt, body, author_name, pinned, audience, image_key, published_at) values
-    (
-      'Welcome to Awake the Nations',
-      'Sundays at 09:30 at 31 Kimberley Street, Townsend Estate, Goodwood.',
-      'Awake the Nations is an Awake house devoted to worship, prayer, and making disciples of all nations. Whatever your background, you are welcome to come as you are. Kids Church runs every Sunday for little ones through to Grade 7; teens join the main meeting.',
-      'Fedillio Einbeck', true, 'all', 'exterior', ${at(-2, 10)}
-    ),
-    (
-      'Awake the Nations — a new series',
-      'Pastor Zion begins a series on God calling His people to rise, shine, and awaken the nations.',
-      'Arise, shine, for your light has come. Series notes will live on the Resources tab. If you would like to read ahead: Isaiah 60, Acts 2, and Matthew 28.',
-      'Zion Matthew', true, 'all', 'scripture', ${at(-5, 8)}
-    ),
-    (
-      'Kids Church still needs hosts',
-      'If you can give one Sunday a month, Lerato would love to train you this week.',
-      'No teaching degree required — just a calm presence and a willingness to learn the room. Speak to Lerato or tap Teams → Kids Church.',
-      'Lerato Mokoena', false, 'all', 'kids', ${at(-6, 12)}
-    )`;
-
-  await sql`
     insert into sermons (title, speaker, series, scripture, preached_at, duration_seconds, description, image_key, transcript) values
     (
       'Awake the Nations',
@@ -388,7 +367,7 @@ export async function seedIfNeeded(sql: Sql) {
       1860,
       'A word on God''s call to rise, shine, and awaken the nations to His presence and power.',
       'arch',
-      'Arise, shine, for your light has come, and the glory of the Lord has risen upon you. That is not a suggestion — it is a call. God is not looking for a people content to stay quiet in the dark. He is raising up a house that will awaken the nations to His presence and power, starting right here in Goodwood. If you came tonight tired of church, or tired of yourself, hear this: the light has come. Arise. Shine.'
+      'Arise, shine, for your light has come, and the glory of the Lord has risen upon you. That is not a suggestion. It is a call. God is not looking for a people content to stay quiet in the dark. He is raising up a house that will awaken the nations to His presence and power, starting right here in Goodwood. If you came tonight tired of church, or tired of yourself, hear this: the light has come. Arise. Shine.'
     ),
     (
       'A house of prayer',
@@ -419,7 +398,7 @@ export async function seedIfNeeded(sql: Sql) {
     { name: "Hospitality", ministry: "hospitality", desc: "Doors, coffee, and first conversations." },
     { name: "Prayer", ministry: "prayer", desc: "The people who hold the rest of us when we cannot pray." },
     { name: "Media", ministry: "media", desc: "Sound, stories, and the recordings that travel further than Kimberley Street." },
-    { name: "Outreach", ministry: "outreach", desc: "No passengers — every gift in the body, on mission in the city." },
+    { name: "Outreach", ministry: "outreach", desc: "No passengers, every gift in the body, on mission in the city." },
   ];
   const teamIds: number[] = [];
   for (const t of teamNames) {
@@ -472,7 +451,7 @@ export async function seedIfNeeded(sql: Sql) {
     },
     {
       name: "Young adults",
-      desc: "Twenty-somethings learning to follow Jesus in Cape Town — work, friendship, and faith.",
+      desc: "Twenty-somethings learning to follow Jesus in Cape Town, through work, friendship, and faith.",
       meets: "Wednesdays · 19:30",
       loc: "Rotating homes",
       age: "young_adults",
@@ -489,10 +468,10 @@ export async function seedIfNeeded(sql: Sql) {
       leader: 12,
     },
     {
-      name: "Teens",
-      desc: "Teens join the main meeting on Sunday, and connect through the week.",
+      name: "Youth",
+      desc: "Youth join the main meeting on Sunday, and connect through the week.",
       meets: "Fridays · 18:30",
-      loc: "The teens room",
+      loc: "The youth room",
       age: "youth",
       img: "kids",
       leader: 9,
@@ -527,7 +506,7 @@ export async function seedIfNeeded(sql: Sql) {
   const ageChannels = [
     ["Little Lights parents", "little_ones"],
     ["Kids Church shepherds", "kids"],
-    ["Teens", "youth"],
+    ["Youth", "youth"],
     ["Young adults", "young_adults"],
     ["Adults", "adults"],
     ["Seniors", "seniors"],
@@ -546,7 +525,7 @@ export async function seedIfNeeded(sql: Sql) {
   await sql`
     insert into messages (channel_id, user_id, author_name, body, created_at) values
     (${chId}, ${"seed"}, ${"Zion Matthew"}, ${"Sundays at 09:30 at 31 Kimberley Street. Come as you are."}, ${at(-1, 16)}),
-    (${chId}, ${"seed"}, ${"Fedillio Einbeck"}, ${"If you have kids: Kids Church runs every Sunday through to Grade 7. Teens stay with us in the main meeting."}, ${at(-1, 17, 20)}),
+    (${chId}, ${"seed"}, ${"Fedillio Einbeck"}, ${"If you have kids: Kids Church runs every Sunday through to Grade 7. Youth stay with us in the main meeting."}, ${at(-1, 17, 20)}),
     (${chId}, ${"seed"}, ${"Priya Naidoo"}, ${"We still need two extra coffee urns for this Sunday. I will be at the church after prayer on Wednesday."}, ${at(0, 8)})
   `;
 

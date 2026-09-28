@@ -6,7 +6,6 @@ import {
   Baby,
   Headphones,
   HeartHandshake,
-  Newspaper,
   Users,
   MessageCircle,
   Library,
@@ -15,6 +14,7 @@ import {
   Menu,
   LogOut,
   MoreHorizontal,
+  ShieldCheck,
 } from "lucide-react";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { signOut } from "@/lib/auth/client";
@@ -33,7 +33,6 @@ const primary = [
 ] as const;
 
 const more = [
-  { to: "/news", label: "News", icon: Newspaper },
   { to: "/groups", label: "Groups", icon: Users },
   { to: "/teams", label: "Teams", icon: FolderOpen },
   { to: "/directory", label: "Directory", icon: UserRound },
@@ -124,6 +123,9 @@ export function AppShell({ me, children }: { me: Me; children: ReactNode }) {
             {more.map((item) => (
               <NavLink key={item.to} {...item} onClick={() => setMenuOpen(false)} />
             ))}
+            {me.isAdmin ? (
+              <NavLink to="/admin" label="Admin" icon={ShieldCheck} onClick={() => setMenuOpen(false)} />
+            ) : null}
           </div>
         </div>
       </nav>

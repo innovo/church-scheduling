@@ -21,17 +21,26 @@ export function NovaWordmark({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span
-        className={cn(
-          "grid size-9 place-items-center rounded-md",
-          inverted ? "bg-primary-fg text-primary" : "bg-primary text-primary-fg",
-        )}
-      >
+      {/* Logo mark is itself blue-toned, so it always sits on a light badge
+          (never a blue one) or it disappears into a blue surface. */}
+      <span className="grid size-9 place-items-center rounded-md bg-white shadow-sm ring-1 ring-black/5">
         <NovaMark className="size-6" />
       </span>
       <span>
-        <span className="block font-display text-lg leading-none font-medium">{CHURCH_NAME}</span>
-        <span className="mt-0.5 block text-[11px] tracking-[0.14em] text-muted uppercase">
+        <span
+          className={cn(
+            "block font-display text-lg leading-none font-medium",
+            inverted ? "text-primary-fg" : "text-fg",
+          )}
+        >
+          {CHURCH_NAME}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block text-[11px] tracking-[0.14em] uppercase",
+            inverted ? "text-primary-fg/70" : "text-muted",
+          )}
+        >
           {subtitle ?? CHURCH_CITY}
         </span>
       </span>

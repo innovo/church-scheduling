@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pause, Play } from "lucide-react";
-import { listSermons } from "@/lib/church/api";
+import { Pause, Play, Trash2 } from "lucide-react";
+import { listSermons, deleteSermon } from "@/lib/church/api";
+import { useMe } from "@/lib/church/me-context";
 import { imageSrc, type Sermon } from "@/lib/church/types";
 import { formatDay } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
@@ -11,15 +12,29 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/_app/sermons")({ component: SermonsPage });
 
 function SermonsPage() {
+  const me = useMe();
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [current, setCurrent] = useState<Sermon | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  useEffect(() => {
+  function reload() {
     listSermons().then((rows) => {
       setSermons(rows);
-      setCurrent(rows[0] ?? null);
+      setCurrent((prev) => (prev && rows.some((r) => r.id === prev.id) ? prev : (rows[0] ?? null)));
     });
-  }, []);
+  }
+  useEffect(reload, []);
+
+  async function onDelete(id: number) {
+    if (!window.confirm("Delete this sermon? This can't be undone.")) return;
+    setDeletingId(id);
+    try {
+      await deleteSermon({ data: id });
+      reload();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div>
@@ -31,21 +46,32 @@ function SermonsPage() {
       {current ? <Player sermon={current} /> : null}
       <div className="mt-8 space-y-3">
         {sermons.map((s) => (
-          <button
+          <div
             key={s.id}
-            type="button"
-            onClick={() => setCurrent(s)}
-            className="flex w-full gap-4 overflow-hidden rounded-xl bg-surface text-left shadow-[var(--shadow-card)]"
+            className="flex w-full items-center gap-4 overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]"
           >
-            <img src={imageSrc(s.imageKey)} alt="" className="h-24 w-24 shrink-0 object-cover" />
-            <div className="py-3 pr-4">
-              <p className="text-xs text-muted">{s.series}</p>
-              <h2 className="font-display text-lg font-medium">{s.title}</h2>
-              <p className="text-sm text-muted">
-                {s.speaker} · {s.scripture} · {formatDay(s.preachedAt)}
-              </p>
-            </div>
-          </button>
+            <button type="button" onClick={() => setCurrent(s)} className="flex flex-1 gap-4 text-left">
+              <img src={imageSrc(s.imageKey)} alt="" className="h-24 w-24 shrink-0 object-cover" />
+              <div className="py-3 pr-4">
+                <p className="text-xs text-muted">{s.series}</p>
+                <h2 className="font-display text-lg font-medium">{s.title}</h2>
+                <p className="text-sm text-muted">
+                  {s.speaker} · {s.scripture} · {formatDay(s.preachedAt)}
+                </p>
+              </div>
+            </button>
+            {me.isStaff ? (
+              <button
+                type="button"
+                title="Delete sermon"
+                disabled={deletingId === s.id}
+                onClick={() => onDelete(s.id)}
+                className="mr-4 grid size-8 shrink-0 place-items-center rounded-full text-muted transition hover:bg-destructive hover:text-white"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            ) : null}
+          </div>
         ))}
       </div>
     </div>

@@ -47,6 +47,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Bumps every rem-based text size (text-sm, text-base, text-lg, …) up by
+       ~2px across the board: 16px base -> 18px. */
+    font-size: 112.5%;
   }
 
   html,

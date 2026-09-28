@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppDirectoryRouteImport } from './routes/_app/directory'
 import { Route as AppEventsRouteImport } from './routes/_app/events'
 import { Route as AppGiveRouteImport } from './routes/_app/give'
@@ -19,12 +21,14 @@ import { Route as AppGroupsRouteImport } from './routes/_app/groups'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppKidsRouteImport } from './routes/_app/kids'
 import { Route as AppMessagesRouteImport } from './routes/_app/messages'
-import { Route as AppNewsRouteImport } from './routes/_app/news'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppResourcesRouteImport } from './routes/_app/resources'
 import { Route as AppSermonsRouteImport } from './routes/_app/sermons'
 import { Route as AppTeamsRouteImport } from './routes/_app/teams'
+import { Route as ApiPayfastNotifyRouteImport } from './routes/api/payfast-notify'
+import { Route as ApiYocoWebhookRouteImport } from './routes/api/yoco-webhook'
 import { Route as AppEventsEventIdRouteImport } from './routes/_app/events.$eventId'
+import { Route as AppGiveThanksRouteImport } from './routes/_app/give.thanks'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -40,6 +44,16 @@ const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppDirectoryRoute = AppDirectoryRouteImport.update({
   id: '/directory',
@@ -76,11 +90,6 @@ const AppMessagesRoute = AppMessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => AppRoute,
 } as any)
-const AppNewsRoute = AppNewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -101,10 +110,25 @@ const AppTeamsRoute = AppTeamsRouteImport.update({
   path: '/teams',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPayfastNotifyRoute = ApiPayfastNotifyRouteImport.update({
+  id: '/api/payfast-notify',
+  path: '/api/payfast-notify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiYocoWebhookRoute = ApiYocoWebhookRouteImport.update({
+  id: '/api/yoco-webhook',
+  path: '/api/yoco-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppEventsEventIdRoute = AppEventsEventIdRouteImport.update({
   id: '/$eventId',
   path: '/$eventId',
   getParentRoute: () => AppEventsRoute,
+} as any)
+const AppGiveThanksRoute = AppGiveThanksRouteImport.update({
+  id: '/thanks',
+  path: '/thanks',
+  getParentRoute: () => AppGiveRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -115,37 +139,45 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AppAdminRoute
   '/directory': typeof AppDirectoryRoute
   '/events': typeof AppEventsRouteWithChildren
-  '/give': typeof AppGiveRoute
+  '/give': typeof AppGiveRouteWithChildren
   '/groups': typeof AppGroupsRoute
   '/home': typeof AppHomeRoute
   '/kids': typeof AppKidsRoute
   '/messages': typeof AppMessagesRoute
-  '/news': typeof AppNewsRoute
   '/profile': typeof AppProfileRoute
   '/resources': typeof AppResourcesRoute
   '/sermons': typeof AppSermonsRoute
   '/teams': typeof AppTeamsRoute
+  '/api/payfast-notify': typeof ApiPayfastNotifyRoute
+  '/api/yoco-webhook': typeof ApiYocoWebhookRoute
   '/events/$eventId': typeof AppEventsEventIdRoute
+  '/give/thanks': typeof AppGiveThanksRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AppAdminRoute
   '/directory': typeof AppDirectoryRoute
   '/events': typeof AppEventsRouteWithChildren
-  '/give': typeof AppGiveRoute
+  '/give': typeof AppGiveRouteWithChildren
   '/groups': typeof AppGroupsRoute
   '/home': typeof AppHomeRoute
   '/kids': typeof AppKidsRoute
   '/messages': typeof AppMessagesRoute
-  '/news': typeof AppNewsRoute
   '/profile': typeof AppProfileRoute
   '/resources': typeof AppResourcesRoute
   '/sermons': typeof AppSermonsRoute
   '/teams': typeof AppTeamsRoute
+  '/api/payfast-notify': typeof ApiPayfastNotifyRoute
+  '/api/yoco-webhook': typeof ApiYocoWebhookRoute
   '/events/$eventId': typeof AppEventsEventIdRoute
+  '/give/thanks': typeof AppGiveThanksRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -153,19 +185,23 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/_app/admin': typeof AppAdminRoute
   '/_app/directory': typeof AppDirectoryRoute
   '/_app/events': typeof AppEventsRouteWithChildren
-  '/_app/give': typeof AppGiveRoute
+  '/_app/give': typeof AppGiveRouteWithChildren
   '/_app/groups': typeof AppGroupsRoute
   '/_app/home': typeof AppHomeRoute
   '/_app/kids': typeof AppKidsRoute
   '/_app/messages': typeof AppMessagesRoute
-  '/_app/news': typeof AppNewsRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/resources': typeof AppResourcesRoute
   '/_app/sermons': typeof AppSermonsRoute
   '/_app/teams': typeof AppTeamsRoute
+  '/api/payfast-notify': typeof ApiPayfastNotifyRoute
+  '/api/yoco-webhook': typeof ApiYocoWebhookRoute
   '/_app/events/$eventId': typeof AppEventsEventIdRoute
+  '/_app/give/thanks': typeof AppGiveThanksRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -173,6 +209,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/reset-password'
+    | '/admin'
     | '/directory'
     | '/events'
     | '/give'
@@ -180,17 +218,21 @@ export interface FileRouteTypes {
     | '/home'
     | '/kids'
     | '/messages'
-    | '/news'
     | '/profile'
     | '/resources'
     | '/sermons'
     | '/teams'
+    | '/api/payfast-notify'
+    | '/api/yoco-webhook'
     | '/events/$eventId'
+    | '/give/thanks'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/reset-password'
+    | '/admin'
     | '/directory'
     | '/events'
     | '/give'
@@ -198,18 +240,22 @@ export interface FileRouteTypes {
     | '/home'
     | '/kids'
     | '/messages'
-    | '/news'
     | '/profile'
     | '/resources'
     | '/sermons'
     | '/teams'
+    | '/api/payfast-notify'
+    | '/api/yoco-webhook'
     | '/events/$eventId'
+    | '/give/thanks'
     | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/login'
+    | '/reset-password'
+    | '/_app/admin'
     | '/_app/directory'
     | '/_app/events'
     | '/_app/give'
@@ -217,12 +263,14 @@ export interface FileRouteTypes {
     | '/_app/home'
     | '/_app/kids'
     | '/_app/messages'
-    | '/_app/news'
     | '/_app/profile'
     | '/_app/resources'
     | '/_app/sermons'
     | '/_app/teams'
+    | '/api/payfast-notify'
+    | '/api/yoco-webhook'
     | '/_app/events/$eventId'
+    | '/_app/give/thanks'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -230,6 +278,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPayfastNotifyRoute: typeof ApiPayfastNotifyRoute
+  ApiYocoWebhookRoute: typeof ApiYocoWebhookRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -255,6 +306,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/directory': {
       id: '/_app/directory'
@@ -305,13 +370,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMessagesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/news': {
-      id: '/_app/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof AppNewsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
@@ -340,12 +398,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTeamsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/payfast-notify': {
+      id: '/api/payfast-notify'
+      path: '/api/payfast-notify'
+      fullPath: '/api/payfast-notify'
+      preLoaderRoute: typeof ApiPayfastNotifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/yoco-webhook': {
+      id: '/api/yoco-webhook'
+      path: '/api/yoco-webhook'
+      fullPath: '/api/yoco-webhook'
+      preLoaderRoute: typeof ApiYocoWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/events/$eventId': {
       id: '/_app/events/$eventId'
       path: '/$eventId'
       fullPath: '/events/$eventId'
       preLoaderRoute: typeof AppEventsEventIdRouteImport
       parentRoute: typeof AppEventsRoute
+    }
+    '/_app/give/thanks': {
+      id: '/_app/give/thanks'
+      path: '/thanks'
+      fullPath: '/give/thanks'
+      preLoaderRoute: typeof AppGiveThanksRouteImport
+      parentRoute: typeof AppGiveRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -369,15 +448,26 @@ const AppEventsRouteWithChildren = AppEventsRoute._addFileChildren(
   AppEventsRouteChildren,
 )
 
+interface AppGiveRouteChildren {
+  AppGiveThanksRoute: typeof AppGiveThanksRoute
+}
+
+const AppGiveRouteChildren: AppGiveRouteChildren = {
+  AppGiveThanksRoute: AppGiveThanksRoute,
+}
+
+const AppGiveRouteWithChildren =
+  AppGiveRoute._addFileChildren(AppGiveRouteChildren)
+
 interface AppRouteChildren {
+  AppAdminRoute: typeof AppAdminRoute
   AppDirectoryRoute: typeof AppDirectoryRoute
   AppEventsRoute: typeof AppEventsRouteWithChildren
-  AppGiveRoute: typeof AppGiveRoute
+  AppGiveRoute: typeof AppGiveRouteWithChildren
   AppGroupsRoute: typeof AppGroupsRoute
   AppHomeRoute: typeof AppHomeRoute
   AppKidsRoute: typeof AppKidsRoute
   AppMessagesRoute: typeof AppMessagesRoute
-  AppNewsRoute: typeof AppNewsRoute
   AppProfileRoute: typeof AppProfileRoute
   AppResourcesRoute: typeof AppResourcesRoute
   AppSermonsRoute: typeof AppSermonsRoute
@@ -385,14 +475,14 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAdminRoute: AppAdminRoute,
   AppDirectoryRoute: AppDirectoryRoute,
   AppEventsRoute: AppEventsRouteWithChildren,
-  AppGiveRoute: AppGiveRoute,
+  AppGiveRoute: AppGiveRouteWithChildren,
   AppGroupsRoute: AppGroupsRoute,
   AppHomeRoute: AppHomeRoute,
   AppKidsRoute: AppKidsRoute,
   AppMessagesRoute: AppMessagesRoute,
-  AppNewsRoute: AppNewsRoute,
   AppProfileRoute: AppProfileRoute,
   AppResourcesRoute: AppResourcesRoute,
   AppSermonsRoute: AppSermonsRoute,
@@ -405,6 +495,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  ApiPayfastNotifyRoute: ApiPayfastNotifyRoute,
+  ApiYocoWebhookRoute: ApiYocoWebhookRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

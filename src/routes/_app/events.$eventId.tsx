@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarPlus, MapPin } from "lucide-react";
 import { cancelRsvp, getEvent, rsvpEvent } from "@/lib/church/api";
-import { imageSrc, type ChurchEvent } from "@/lib/church/types";
+import { eventImageSrc, type ChurchEvent } from "@/lib/church/types";
 import { formatMoney, formatWhen } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +43,7 @@ function EventDetail() {
       const res = await rsvpEvent({ data: { eventId: id, tickets } });
       setMessage(
         paid
-          ? `Tickets reserved. ${formatMoney(res.paidCents)} recorded (demo payment — connect PayFast or Stripe to take live cards).`
+          ? `Tickets reserved. ${formatMoney(res.paidCents)} recorded.`
           : "You’re on the list. We’ll see you there.",
       );
       reload();
@@ -68,7 +68,7 @@ function EventDetail() {
         ← Events
       </Link>
       <div className="mt-4 overflow-hidden rounded-2xl bg-surface shadow-[var(--shadow-card)]">
-        <img src={imageSrc(event.imageKey)} alt="" className="h-56 w-full object-cover sm:h-72" />
+        <img src={eventImageSrc(event)} alt="" className="h-56 w-full object-cover sm:h-72" />
         <div className="p-6">
           <div className="flex flex-wrap gap-2">
             <Badge>{event.visibility === "public" ? "Open" : "Members"}</Badge>

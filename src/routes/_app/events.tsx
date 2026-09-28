@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { listEvents, createEvent } from "@/lib/church/api";
+import { Trash2 } from "lucide-react";
+import { listEvents, createEvent, deleteEvent } from "@/lib/church/api";
+import { uploadImage } from "@/lib/church/upload";
 import { useMe } from "@/lib/church/me-context";
-import { imageSrc, type ChurchEvent } from "@/lib/church/types";
+import { eventImageSrc, type ChurchEvent } from "@/lib/church/types";
 import { formatMoney, formatWhen } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -18,12 +20,42 @@ export const Route = createFileRoute("/_app/events")({ component: EventsPage });
 function EventsPage() {
   const me = useMe();
   const [events, setEvents] = useState<ChurchEvent[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [open, setOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   function reload() {
-    listEvents().then(setEvents);
+    setEvents(null);
+    listEvents({ data: undefined }).then(({ events: rows, hasMore: more }) => {
+      setEvents(rows);
+      setHasMore(more);
+    });
   }
   useEffect(reload, []);
+
+  async function loadMore() {
+    if (!events) return;
+    setLoadingMore(true);
+    try {
+      const { events: more, hasMore: nextHasMore } = await listEvents({ data: { offset: events.length } });
+      setEvents([...events, ...more]);
+      setHasMore(nextHasMore);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function onDelete(id: number) {
+    if (!window.confirm("Delete this event? This can't be undone.")) return;
+    setDeletingId(id);
+    try {
+      await deleteEvent({ data: id });
+      setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div>
@@ -48,28 +80,48 @@ function EventsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {events.map((ev) => (
-            <Link
-              key={ev.id}
-              to="/events/$eventId"
-              params={{ eventId: String(ev.id) }}
-              className="overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]"
-            >
-              <img src={imageSrc(ev.imageKey)} alt="" className="h-40 w-full object-cover" />
-              <div className="p-5">
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{ev.visibility === "public" ? "Open" : "Members"}</Badge>
-                  {ev.ticketCents > 0 ? <Badge tone="primary">{formatMoney(ev.ticketCents)}</Badge> : <Badge tone="warm">Free</Badge>}
-                  {ev.mine ? <Badge tone="primary">Going</Badge> : null}
+            <div key={ev.id} className="relative overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)]">
+              {me.isStaff ? (
+                <button
+                  type="button"
+                  title="Delete event"
+                  disabled={deletingId === ev.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDelete(ev.id);
+                  }}
+                  className="absolute top-2 right-2 z-10 grid size-8 place-items-center rounded-full bg-black/50 text-white transition hover:bg-destructive"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              ) : null}
+              <Link to="/events/$eventId" params={{ eventId: String(ev.id) }} className="block">
+                <img src={eventImageSrc(ev)} alt="" className="h-40 w-full object-cover" />
+                <div className="p-5">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{ev.visibility === "public" ? "Open" : "Members"}</Badge>
+                    {ev.ticketCents > 0 ? <Badge tone="primary">{formatMoney(ev.ticketCents)}</Badge> : <Badge tone="warm">Free</Badge>}
+                    {ev.mine ? <Badge tone="primary">Going</Badge> : null}
+                  </div>
+                  <h2 className="mt-3 font-display text-xl font-medium">{ev.title}</h2>
+                  <p className="mt-1 text-sm text-muted">{formatWhen(ev.startsAt)}</p>
+                  <p className="text-sm text-muted">{ev.location}</p>
+                  <p className="mt-2 text-xs text-faint">{ev.going} going</p>
                 </div>
-                <h2 className="mt-3 font-display text-xl font-medium">{ev.title}</h2>
-                <p className="mt-1 text-sm text-muted">{formatWhen(ev.startsAt)}</p>
-                <p className="text-sm text-muted">{ev.location}</p>
-                <p className="mt-2 text-xs text-faint">{ev.going} going</p>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
+
+      {events && events.length > 0 && hasMore ? (
+        <div className="mt-6 flex justify-center">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more events"}
+          </Button>
+        </div>
+      ) : null}
 
       <CreateEventDialog
         open={open}
@@ -94,6 +146,35 @@ function CreateEventDialog({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function onPickImage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image is too large, max 8MB");
+      return;
+    }
+    setImageBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadImage({ data: { dataUrl, kind: "event" } });
+      setImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload image");
+    } finally {
+      setImageBusy(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -114,9 +195,11 @@ function CreateEventDialog({
           kind: String(fd.get("kind") || "special"),
           ticketCents: Math.round(Number(fd.get("price") || 0) * 100),
           imageKey: "sanctuary",
+          imageUrl,
         },
       });
       onCreated();
+      setImageUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create event");
     } finally {
@@ -131,6 +214,30 @@ function CreateEventDialog({
           <DialogTitle>New event</DialogTitle>
         </DialogHeader>
         <form className="space-y-3" onSubmit={onSubmit}>
+          <div className="space-y-1.5">
+            <Label>Invitation image (optional, max 8MB)</Label>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={imageBusy}
+              className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-input bg-surface text-sm text-muted"
+            >
+              {imageBusy ? (
+                "Uploading…"
+              ) : imageUrl ? (
+                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                "Tap to add an image"
+              )}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={onPickImage}
+            />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" required />

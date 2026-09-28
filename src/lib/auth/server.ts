@@ -39,6 +39,7 @@ import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
+import { sendResetPasswordEmail } from "./send-email.server";
 import { pgliteDialect } from "./pglite-dialect";
 import {
   GROK_ISSUER_DEFAULT,
@@ -172,12 +173,37 @@ const grokOAuthPlugin = authConfigured
     })
   : null;
 
+// Real Google / X (Twitter) sign-in with Amy's OWN credentials — separate
+// from the sandbox-only "Grok broker" above, which only ever worked on
+// *.grok-sandbox.com preview URLs and can't be used in production. Each is
+// only enabled when both id + secret are present, so a deploy missing them
+// simply shows no button for that provider instead of erroring.
+const googleClientId = env("GOOGLE_CLIENT_ID");
+const googleClientSecret = env("GOOGLE_CLIENT_SECRET");
+const xClientId = env("X_CLIENT_ID") ?? env("TWITTER_CLIENT_ID");
+const xClientSecret = env("X_CLIENT_SECRET") ?? env("TWITTER_CLIENT_SECRET");
+
+export const realSocialProvidersConfigured = {
+  google: Boolean(googleClientId && googleClientSecret),
+  x: Boolean(xClientId && xClientSecret),
+};
+
 export const auth = betterAuth({
   baseURL,
   // Deployed apps inject BETTER_AUTH_SECRET. Preview: process-stable secret on
   // globalThis so HMR doesn't invalidate PGLite-backed sessions (see above).
   secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
   database,
+
+  // Real Google / X sign-in — see `realSocialProvidersConfigured` above.
+  socialProviders: {
+    ...(realSocialProvidersConfigured.google
+      ? { google: { clientId: googleClientId as string, clientSecret: googleClientSecret as string } }
+      : {}),
+    ...(realSocialProvidersConfigured.x
+      ? { twitter: { clientId: xClientId as string, clientSecret: xClientSecret as string } }
+      : {}),
+  },
 
   // CSRF / origin check for credentialed auth POSTs (email sign-up/sign-in, …).
   // See `trustedOrigins` construction above — must cover live preview hosts AND
@@ -211,7 +237,18 @@ export const auth = betterAuth({
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+  // `sendResetPassword` powers "Forgot password" on the sign-in page (see
+  // `send-email.server.ts` — requires RESEND_API_KEY).
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          sendResetPassword: async ({ user, url }) => {
+            await sendResetPasswordEmail({ to: user.email, url });
+          },
+        },
+      }
+    : {}),
 
   // `__Host-` prefixed cookies: the browser REFUSES any same-named cookie that
   // carries a `Domain` attribute, so a sibling `*.grok.me` app cannot "toss" a

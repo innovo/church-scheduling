@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Pause, Play, Trash2 } from "lucide-react";
-import { listSermons, deleteSermon } from "@/lib/church/api";
+import { listSermons, deleteSermon, createSermon } from "@/lib/church/api";
+import { uploadAudio } from "@/lib/church/upload";
 import { useMe } from "@/lib/church/me-context";
 import { imageSrc, type Sermon } from "@/lib/church/types";
 import { formatDay } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_app/sermons")({ component: SermonsPage });
 
@@ -16,6 +21,7 @@ function SermonsPage() {
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [current, setCurrent] = useState<Sermon | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
 
   function reload() {
     listSermons().then((rows) => {
@@ -36,12 +42,15 @@ function SermonsPage() {
     }
   }
 
+  const canAdd = me.isStaff || me.isAdmin;
+
   return (
     <div>
       <PageHeader
         kicker="Listen"
         title="Sermons"
         description="Sunday’s word, kept for the week. Pastor Zion, Pastor Fedillio, and whoever God raises to teach."
+        actions={canAdd ? <Button onClick={() => setOpen(true)}>New sermon</Button> : null}
       />
       {current ? <Player sermon={current} /> : null}
       <div className="mt-8 space-y-3">
@@ -74,7 +83,147 @@ function SermonsPage() {
           </div>
         ))}
       </div>
+
+      <NewSermonDialog
+        open={open}
+        onOpenChange={setOpen}
+        onCreated={() => {
+          setOpen(false);
+          reload();
+        }}
+      />
     </div>
+  );
+}
+
+function NewSermonDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioName, setAudioName] = useState<string | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function onPickAudio(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    if (file.size > 60 * 1024 * 1024) {
+      setError("Audio is too large, max 60MB");
+      return;
+    }
+    setAudioBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadAudio({ data: { dataUrl } });
+      setAudioUrl(url);
+      setAudioName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload audio");
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBusy(true);
+    setError(null);
+    try {
+      await createSermon({
+        data: {
+          title: String(fd.get("title")),
+          speaker: String(fd.get("speaker")),
+          series: String(fd.get("series") || ""),
+          scripture: String(fd.get("scripture") || ""),
+          preachedAt: String(fd.get("preachedAt")),
+          description: String(fd.get("description") || ""),
+          audioUrl,
+        },
+      });
+      onCreated();
+      setAudioUrl(null);
+      setAudioName(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add sermon");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New sermon</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-3" onSubmit={onSubmit}>
+          <div className="space-y-1.5">
+            <Label>Voice recording (optional, max 60MB)</Label>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={audioBusy}
+              className="flex h-14 w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-input bg-surface px-3 text-sm text-muted"
+            >
+              {audioBusy ? "Uploading…" : audioName ? audioName : "Tap to add a recording"}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/ogg"
+              className="hidden"
+              onChange={onPickAudio}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" name="title" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="speaker">Speaker</Label>
+            <Input id="speaker" name="speaker" required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="series">Series</Label>
+              <Input id="series" name="series" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="scripture">Scripture</Label>
+              <Input id="scripture" name="scripture" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="preachedAt">Date preached</Label>
+            <Input id="preachedAt" name="preachedAt" type="date" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Textarea id="description" name="description" />
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button type="submit" className="w-full" disabled={busy || audioBusy}>
+            {busy ? "Saving…" : "Publish sermon"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -115,7 +264,7 @@ function Player({ sermon }: { sermon: Sermon }) {
           <p className="mt-4 text-sm leading-relaxed opacity-90">{sermon.description}</p>
           <audio
             ref={audio}
-            src="/audio/reflection.wav"
+            src={sermon.audioUrl || "/audio/reflection.wav"}
             onTimeUpdate={() => setT(audio.current?.currentTime ?? 0)}
             onLoadedMetadata={() => {
               const d = audio.current?.duration ?? 0;

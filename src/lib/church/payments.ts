@@ -60,8 +60,10 @@ export const setPaymentGatewayEnabled = createServerFn({ method: "POST" })
   .validator((d: { gateway: "payfast" | "yoco"; enabled: boolean }) => d)
   .handler(async ({ context, data }) => {
     const sql = await getSql();
-    const [me] = await sql<{ is_admin: boolean }>`select is_admin from people where user_id = ${context.userId} limit 1`;
-    if (!me?.is_admin) throw new Error("Only admins can change payment settings");
+    const [me] = await sql<{ is_admin: boolean; role: string }>`
+      select is_admin, role from people where user_id = ${context.userId} limit 1
+    `;
+    if (!me?.is_admin && me?.role !== "pastor") throw new Error("Only pastors and admins can change payment settings");
     await metaSet(`payments_${data.gateway}_enabled`, data.enabled ? "true" : "false");
     return { ok: true as const };
   });

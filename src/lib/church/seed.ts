@@ -30,10 +30,10 @@ function nextSunday(weeksOut = 0): string {
 async function resetChurch(sql: Sql) {
   await sql.query(`
     truncate table
-      checkins, contributions, messages, resources,
+      checkins, contributions, resources,
       event_registrations, roster_slots, availability,
       team_members, group_members,
-      events, news, sermons, teams, groups, channels,
+      events, news, sermons, teams, groups,
       people, households, church_meta
     restart identity cascade
   `);
@@ -500,34 +500,6 @@ export async function seedIfNeeded(sql: Sql) {
   for (const [gi, pi] of gmem) {
     await sql`insert into group_members (group_id, people_id) values (${groupIds[gi]!}, ${pid(pi)})`;
   }
-
-  const churchCh = await sql<{ id: number }>`
-    insert into channels (name, kind) values ('Awake the Nations', 'church') returning id`;
-  const ageChannels = [
-    ["Little Lights parents", "little_ones"],
-    ["Kids Church shepherds", "kids"],
-    ["Youth", "youth"],
-    ["Young adults", "young_adults"],
-    ["Adults", "adults"],
-    ["Seniors", "seniors"],
-  ];
-  for (const [chName, age] of ageChannels) {
-    await sql`insert into channels (name, kind, age_group) values (${chName}, ${"age"}, ${age})`;
-  }
-  for (let i = 0; i < teamIds.length; i++) {
-    await sql`insert into channels (name, kind, team_id) values (${teamNames[i]!.name}, ${"team"}, ${teamIds[i]!})`;
-  }
-  for (let i = 0; i < groupIds.length; i++) {
-    await sql`insert into channels (name, kind, group_id) values (${groups[i]!.name}, ${"group"}, ${groupIds[i]!})`;
-  }
-
-  const chId = churchCh[0]!.id;
-  await sql`
-    insert into messages (channel_id, user_id, author_name, body, created_at) values
-    (${chId}, ${"seed"}, ${"Zion Matthew"}, ${"Sundays at 09:30 at 31 Kimberley Street. Come as you are."}, ${at(-1, 16)}),
-    (${chId}, ${"seed"}, ${"Fedillio Einbeck"}, ${"If you have kids: Kids Church runs every Sunday through to Grade 7. Youth stay with us in the main meeting."}, ${at(-1, 17, 20)}),
-    (${chId}, ${"seed"}, ${"Priya Naidoo"}, ${"We still need two extra coffee urns for this Sunday. I will be at the church after prayer on Wednesday."}, ${at(0, 8)})
-  `;
 
   await sql`
     insert into resources (title, url, category, description, kind) values

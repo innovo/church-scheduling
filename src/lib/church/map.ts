@@ -20,6 +20,7 @@ export function mapPerson(row: {
   avatar_url?: string | null;
   status?: string;
   is_admin?: boolean;
+  is_tenant_admin?: boolean;
 }): Person {
   return {
     id: row.id,
@@ -41,6 +42,7 @@ export function mapPerson(row: {
     avatarUrl: row.avatar_url ?? null,
     status: (row.status as Person["status"]) ?? "approved",
     isAdmin: row.is_admin ?? false,
+    isTenantAdmin: row.is_tenant_admin ?? false,
   };
 }
 

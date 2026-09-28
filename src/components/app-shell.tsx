@@ -7,7 +7,6 @@ import {
   Headphones,
   HeartHandshake,
   Users,
-  MessageCircle,
   Library,
   FolderOpen,
   UserRound,
@@ -22,7 +21,8 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { cn, initials } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { NovaWordmark } from "@/components/nova-mark";
-import { CHURCH_NAME, type Me } from "@/lib/church/types";
+import { useBranding } from "@/lib/church/branding-context";
+import type { Me } from "@/lib/church/types";
 
 const primary = [
   { to: "/home", label: "Home", icon: Home },
@@ -36,7 +36,6 @@ const more = [
   { to: "/groups", label: "Groups", icon: Users },
   { to: "/teams", label: "Teams", icon: FolderOpen },
   { to: "/directory", label: "Directory", icon: UserRound },
-  { to: "/messages", label: "Messages", icon: MessageCircle },
   { to: "/resources", label: "Resources", icon: Library },
 ] as const;
 
@@ -69,6 +68,7 @@ function NavLink({
 }
 
 export function AppShell({ me, children }: { me: Me; children: ReactNode }) {
+  const branding = useBranding();
   const [moreOpen, setMoreOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -152,7 +152,7 @@ export function AppShell({ me, children }: { me: Me; children: ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <p className="font-display text-lg font-medium">{CHURCH_NAME}</p>
+          <p className="font-display text-lg font-medium">{branding.name}</p>
           <Link to="/profile" className="grid size-11 place-items-center">
             <span className="grid size-8 place-items-center rounded-full bg-primary text-xs font-medium text-primary-fg">
               {initials(me.displayName)}

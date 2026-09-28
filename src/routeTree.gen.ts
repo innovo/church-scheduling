@@ -20,7 +20,6 @@ import { Route as AppGiveRouteImport } from './routes/_app/give'
 import { Route as AppGroupsRouteImport } from './routes/_app/groups'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppKidsRouteImport } from './routes/_app/kids'
-import { Route as AppMessagesRouteImport } from './routes/_app/messages'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppResourcesRouteImport } from './routes/_app/resources'
 import { Route as AppSermonsRouteImport } from './routes/_app/sermons'
@@ -85,11 +84,6 @@ const AppKidsRoute = AppKidsRouteImport.update({
   path: '/kids',
   getParentRoute: () => AppRoute,
 } as any)
-const AppMessagesRoute = AppMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -147,7 +141,6 @@ export interface FileRoutesByFullPath {
   '/groups': typeof AppGroupsRoute
   '/home': typeof AppHomeRoute
   '/kids': typeof AppKidsRoute
-  '/messages': typeof AppMessagesRoute
   '/profile': typeof AppProfileRoute
   '/resources': typeof AppResourcesRoute
   '/sermons': typeof AppSermonsRoute
@@ -169,7 +162,6 @@ export interface FileRoutesByTo {
   '/groups': typeof AppGroupsRoute
   '/home': typeof AppHomeRoute
   '/kids': typeof AppKidsRoute
-  '/messages': typeof AppMessagesRoute
   '/profile': typeof AppProfileRoute
   '/resources': typeof AppResourcesRoute
   '/sermons': typeof AppSermonsRoute
@@ -193,7 +185,6 @@ export interface FileRoutesById {
   '/_app/groups': typeof AppGroupsRoute
   '/_app/home': typeof AppHomeRoute
   '/_app/kids': typeof AppKidsRoute
-  '/_app/messages': typeof AppMessagesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/resources': typeof AppResourcesRoute
   '/_app/sermons': typeof AppSermonsRoute
@@ -217,7 +208,6 @@ export interface FileRouteTypes {
     | '/groups'
     | '/home'
     | '/kids'
-    | '/messages'
     | '/profile'
     | '/resources'
     | '/sermons'
@@ -239,7 +229,6 @@ export interface FileRouteTypes {
     | '/groups'
     | '/home'
     | '/kids'
-    | '/messages'
     | '/profile'
     | '/resources'
     | '/sermons'
@@ -262,7 +251,6 @@ export interface FileRouteTypes {
     | '/_app/groups'
     | '/_app/home'
     | '/_app/kids'
-    | '/_app/messages'
     | '/_app/profile'
     | '/_app/resources'
     | '/_app/sermons'
@@ -363,13 +351,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKidsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/messages': {
-      id: '/_app/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof AppMessagesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
@@ -467,7 +448,6 @@ interface AppRouteChildren {
   AppGroupsRoute: typeof AppGroupsRoute
   AppHomeRoute: typeof AppHomeRoute
   AppKidsRoute: typeof AppKidsRoute
-  AppMessagesRoute: typeof AppMessagesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppResourcesRoute: typeof AppResourcesRoute
   AppSermonsRoute: typeof AppSermonsRoute
@@ -482,7 +462,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppGroupsRoute: AppGroupsRoute,
   AppHomeRoute: AppHomeRoute,
   AppKidsRoute: AppKidsRoute,
-  AppMessagesRoute: AppMessagesRoute,
   AppProfileRoute: AppProfileRoute,
   AppResourcesRoute: AppResourcesRoute,
   AppSermonsRoute: AppSermonsRoute,

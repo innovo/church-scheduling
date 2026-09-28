@@ -37,7 +37,7 @@ function DirectoryPage() {
       <PageHeader
         kicker="People"
         title="Directory"
-        description="Age-group shepherding starts here. Filter the family, then take the conversation to Messages."
+        description="Age-group shepherding starts here. Filter the family to find who you need."
       />
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search names" />

@@ -7,17 +7,21 @@ import {
   isOpsRole,
   isStaffRole,
   personName,
+  CHURCH_NAME,
+  CHURCH_TAGLINE,
+  CHURCH_ADDRESS,
+  CHURCH_EMAIL,
+  CHURCH_PHONE,
   type Me,
   type ChurchEvent,
   type Sermon,
   type Team,
   type Group,
-  type Channel,
-  type ChatMessage,
   type Resource,
   type Contribution,
   type Checkin,
   type ChildRecord,
+  type Branding,
 } from "./types";
 
 type PersonRow = Parameters<typeof mapPerson>[0];
@@ -48,25 +52,18 @@ async function loadMe(
   // until a pastor/admin approves them (see the People/Approvals screen).
   const status = isFirstEver ? "approved" : "pending";
   const isAdmin = isFirstEver;
+  const isTenantAdmin = isFirstEver;
   const { first, last } = splitName(hint?.name ?? null, hint?.email ?? null);
   const hh = await sql<{ id: number }>`insert into households (name) values (${last || first}) returning id`;
   const qr = token();
   const hue = Math.floor(Math.random() * 360);
   const rows = await sql<PersonRow>`
     insert into people (
-      user_id, household_id, first_name, last_name, email, role, age_group, qr_token, avatar_hue, status, is_admin
+      user_id, household_id, first_name, last_name, email, role, age_group, qr_token, avatar_hue, status, is_admin, is_tenant_admin
     ) values (
-      ${userId}, ${hh[0]!.id}, ${first}, ${last}, ${hint?.email ?? null}, ${role}, ${"adults"}, ${qr}, ${hue}, ${status}, ${isAdmin}
+      ${userId}, ${hh[0]!.id}, ${first}, ${last}, ${hint?.email ?? null}, ${role}, ${"adults"}, ${qr}, ${hue}, ${status}, ${isAdmin}, ${isTenantAdmin}
     ) returning *`;
   const p = mapPerson(rows[0]!);
-
-  const church = await sql<{ id: number }>`select id from channels where kind = 'church' limit 1`;
-  if (church[0] && role === "pastor") {
-    await sql`
-      insert into messages (channel_id, user_id, author_name, body)
-      values (${church[0].id}, ${userId}, ${personName(p)}, ${"I have just arrived at Awake the Nations. Grateful to be here."})
-    `;
-  }
 
   return {
     ...p,
@@ -123,6 +120,7 @@ function mapSermon(row: {
   description: string;
   image_key: string;
   transcript: string;
+  audio_url: string | null;
 }): Sermon {
   return {
     id: row.id,
@@ -135,6 +133,7 @@ function mapSermon(row: {
     description: row.description,
     imageKey: row.image_key,
     transcript: row.transcript,
+    audioUrl: row.audio_url ?? null,
   };
 }
 
@@ -196,9 +195,6 @@ export const getHome = createServerFn({ method: "POST" })
       select count(*)::int as n from checkins
       where service_date = current_date and checked_out_at is null
     `;
-    const unreadHint = await sql<{ n: number }>`
-      select count(*)::int as n from messages where created_at > now() - interval '2 days'
-    `;
     return {
       me,
       events: events.map(mapEvent),
@@ -206,7 +202,6 @@ export const getHome = createServerFn({ method: "POST" })
       teams: myTeams.map((t) => t.name),
       givenCents: giving[0]?.total ?? 0,
       kidsOnSite: kidsToday[0]?.n ?? 0,
-      recentMessages: unreadHint[0]?.n ?? 0,
     };
   });
 
@@ -258,8 +253,76 @@ export const listPeople = createServerFn({ method: "GET" })
   });
 
 function assertAdmin(me: Me) {
-  if (!me.isAdmin) throw new Error("Only admins can do that");
+  if (!me.isAdmin && !me.isTenantAdmin) throw new Error("Only admins can do that");
 }
+
+function assertTenantAdmin(me: Me) {
+  if (!me.isTenantAdmin) throw new Error("Only a tenant admin can do that");
+}
+
+async function brandingMetaGet(key: string): Promise<string | null> {
+  const sql = await getSql();
+  const rows = await sql<{ value: string }>`select value from church_meta where key = ${key}`;
+  return rows[0]?.value ?? null;
+}
+
+async function brandingMetaSet(key: string, value: string) {
+  const sql = await getSql();
+  await sql`
+    insert into church_meta (key, value) values (${key}, ${value})
+    on conflict (key) do update set value = excluded.value
+  `;
+}
+
+/** Public: anyone can read the current branding, including logged-out pages. */
+export const getBranding = createServerFn({ method: "GET" }).handler(async (): Promise<Branding> => {
+  const [name, tagline, address, email, phone, logoUrl, primaryColor] = await Promise.all([
+    brandingMetaGet("branding_name"),
+    brandingMetaGet("branding_tagline"),
+    brandingMetaGet("branding_address"),
+    brandingMetaGet("branding_email"),
+    brandingMetaGet("branding_phone"),
+    brandingMetaGet("branding_logo_url"),
+    brandingMetaGet("branding_color"),
+  ]);
+  return {
+    name: name ?? CHURCH_NAME,
+    tagline: tagline ?? CHURCH_TAGLINE,
+    address: address ?? CHURCH_ADDRESS,
+    email: email ?? CHURCH_EMAIL,
+    phone: phone ?? CHURCH_PHONE,
+    logoUrl,
+    primaryColor,
+  };
+});
+
+export const updateBranding = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (d: {
+      name: string;
+      tagline: string;
+      address: string;
+      email: string;
+      phone: string;
+      logoUrl?: string | null;
+      primaryColor?: string | null;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    assertTenantAdmin(me);
+    await Promise.all([
+      brandingMetaSet("branding_name", data.name.trim()),
+      brandingMetaSet("branding_tagline", data.tagline.trim()),
+      brandingMetaSet("branding_address", data.address.trim()),
+      brandingMetaSet("branding_email", data.email.trim()),
+      brandingMetaSet("branding_phone", data.phone.trim()),
+      data.logoUrl != null ? brandingMetaSet("branding_logo_url", data.logoUrl) : Promise.resolve(),
+      data.primaryColor != null ? brandingMetaSet("branding_color", data.primaryColor) : Promise.resolve(),
+    ]);
+    return { ok: true as const };
+  });
 
 /** Everyone (any status), for the admin People/Approvals screen. */
 export const listPeopleForAdmin = createServerFn({ method: "GET" })
@@ -293,7 +356,15 @@ export const setPersonRole = createServerFn({ method: "POST" })
     const me = await loadMe(context.userId);
     assertAdmin(me);
     const sql = await getSql();
-    await sql`update people set role = ${data.role} where id = ${data.personId}`;
+    const target = await sql<{ role: string }>`select role from people where id = ${data.personId}`;
+    const touchesPastor = target[0]?.role === "pastor" || data.role === "pastor";
+    if (touchesPastor) assertTenantAdmin(me);
+    // Pastors are admins by default, so they can manage teams, groups, events, and payments.
+    if (data.role === "pastor") {
+      await sql`update people set role = ${data.role}, is_admin = true where id = ${data.personId}`;
+    } else {
+      await sql`update people set role = ${data.role} where id = ${data.personId}`;
+    }
     return { ok: true as const };
   });
 
@@ -302,13 +373,49 @@ export const setPersonAdmin = createServerFn({ method: "POST" })
   .validator((d: { personId: number; isAdmin: boolean }) => d)
   .handler(async ({ context, data }) => {
     const me = await loadMe(context.userId);
-    assertAdmin(me);
+    assertTenantAdmin(me);
     const sql = await getSql();
     if (data.isAdmin) {
       const target = await sql<{ user_id: string | null }>`select user_id from people where id = ${data.personId}`;
       if (!target[0]?.user_id) throw new Error("This person doesn't have a login yet, so they can't be made an admin");
     }
     await sql`update people set is_admin = ${data.isAdmin} where id = ${data.personId}`;
+    return { ok: true as const };
+  });
+
+export const setPersonTenantAdmin = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { personId: number; isTenantAdmin: boolean }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    assertTenantAdmin(me);
+    const sql = await getSql();
+    if (data.isTenantAdmin) {
+      const target = await sql<{ user_id: string | null }>`select user_id from people where id = ${data.personId}`;
+      if (!target[0]?.user_id)
+        throw new Error("This person doesn't have a login yet, so they can't be made a tenant admin");
+    } else if (data.personId === me.id) {
+      throw new Error("You can't remove your own tenant admin access");
+    }
+    await sql`update people set is_tenant_admin = ${data.isTenantAdmin} where id = ${data.personId}`;
+    return { ok: true as const };
+  });
+
+export const deletePerson = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((personId: number) => personId)
+  .handler(async ({ context, data: personId }) => {
+    const me = await loadMe(context.userId);
+    assertTenantAdmin(me);
+    if (personId === me.id) throw new Error("You can't remove your own account");
+    const sql = await getSql();
+    // team_members, availability, roster_slots, group_members, and checkins cascade
+    // automatically. event_registrations.people_id and groups.leader_people_id are
+    // nullable references without a cascade rule, so clear those first or the delete
+    // fails with a foreign key violation.
+    await sql`update event_registrations set people_id = null where people_id = ${personId}`;
+    await sql`update groups set leader_people_id = null where leader_people_id = ${personId}`;
+    await sql`delete from people where id = ${personId}`;
     return { ok: true as const };
   });
 
@@ -469,6 +576,38 @@ export const deleteSermon = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const createSermon = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (d: {
+      title: string;
+      speaker: string;
+      series?: string;
+      scripture?: string;
+      preachedAt: string;
+      durationSeconds?: number;
+      description?: string;
+      imageKey?: string;
+      transcript?: string;
+      audioUrl?: string | null;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff && !me.isAdmin) throw new Error("Only pastors and admins can add sermons");
+    const sql = await getSql();
+    const rows = await sql<{ id: number }>`
+      insert into sermons (
+        title, speaker, series, scripture, preached_at, duration_seconds, description, image_key, transcript, audio_url
+      ) values (
+        ${data.title.trim()}, ${data.speaker.trim()}, ${data.series?.trim() || ""}, ${data.scripture?.trim() || ""},
+        ${data.preachedAt}, ${data.durationSeconds ?? 1800}, ${data.description?.trim() || ""},
+        ${data.imageKey || "scripture"}, ${data.transcript?.trim() || ""}, ${data.audioUrl ?? null}
+      ) returning id
+    `;
+    return { id: rows[0]!.id };
+  });
+
 export const listTeams = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -504,6 +643,50 @@ export const listTeams = createServerFn({ method: "GET" })
         mine: ms.some((m) => m.people_id === me.id),
       };
     });
+  });
+
+export const createTeam = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { name: string; description?: string; ministry: string }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can add teams");
+    const sql = await getSql();
+    const rows = await sql<{ id: number }>`
+      insert into teams (name, description, ministry)
+      values (${data.name.trim()}, ${data.description?.trim() || ""}, ${data.ministry.trim()})
+      returning id
+    `;
+    return { id: rows[0]!.id };
+  });
+
+export const updateTeam = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((d: { teamId: number; name: string; description?: string; ministry: string }) => d)
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can edit teams");
+    const sql = await getSql();
+    await sql`
+      update teams set name = ${data.name.trim()}, description = ${data.description?.trim() || ""},
+        ministry = ${data.ministry.trim()}
+      where id = ${data.teamId}
+    `;
+    return { ok: true as const };
+  });
+
+export const deleteTeam = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((teamId: number) => teamId)
+  .handler(async ({ context, data: teamId }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can delete teams");
+    const sql = await getSql();
+    await sql`delete from roster_slots where team_id = ${teamId}`;
+    await sql`delete from availability where team_id = ${teamId}`;
+    await sql`delete from team_members where team_id = ${teamId}`;
+    await sql`delete from teams where id = ${teamId}`;
+    return { ok: true as const };
   });
 
 export const joinTeam = createServerFn({ method: "POST" })
@@ -670,6 +853,71 @@ export const listGroups = createServerFn({ method: "GET" })
     );
   });
 
+export const createGroup = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (d: {
+      name: string;
+      description?: string;
+      meets: string;
+      location?: string;
+      ageGroup?: string | null;
+      imageKey?: string;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can add groups");
+    const sql = await getSql();
+    const rows = await sql<{ id: number }>`
+      insert into groups (name, description, meets, location, age_group, image_key)
+      values (
+        ${data.name.trim()}, ${data.description?.trim() || ""}, ${data.meets.trim()},
+        ${data.location?.trim() || ""}, ${data.ageGroup || null}, ${data.imageKey || "study"}
+      ) returning id
+    `;
+    return { id: rows[0]!.id };
+  });
+
+export const updateGroup = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (d: {
+      groupId: number;
+      name: string;
+      description?: string;
+      meets: string;
+      location?: string;
+      ageGroup?: string | null;
+      imageKey?: string;
+    }) => d,
+  )
+  .handler(async ({ context, data }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can edit groups");
+    const sql = await getSql();
+    await sql`
+      update groups set
+        name = ${data.name.trim()}, description = ${data.description?.trim() || ""}, meets = ${data.meets.trim()},
+        location = ${data.location?.trim() || ""}, age_group = ${data.ageGroup || null},
+        image_key = ${data.imageKey || "study"}
+      where id = ${data.groupId}
+    `;
+    return { ok: true as const };
+  });
+
+export const deleteGroup = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((groupId: number) => groupId)
+  .handler(async ({ context, data: groupId }) => {
+    const me = await loadMe(context.userId);
+    if (!me.isStaff) throw new Error("Only pastors and staff can delete groups");
+    const sql = await getSql();
+    await sql`delete from group_members where group_id = ${groupId}`;
+    await sql`delete from groups where id = ${groupId}`;
+    return { ok: true as const };
+  });
+
 export const joinGroup = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((groupId: number) => groupId)
@@ -684,69 +932,6 @@ export const joinGroup = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-export const listChannels = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const me = await loadMe(context.userId);
-    const sql = await getSql();
-    const rows = await sql<{ id: number; name: string; kind: string }>`
-      select c.id, c.name, c.kind
-      from channels c
-      where c.kind = 'church'
-         or (c.kind = 'age' and c.age_group = ${me.ageGroup})
-         or (c.kind = 'team' and exists (
-              select 1 from team_members tm where tm.team_id = c.team_id and tm.people_id = ${me.id}
-            ))
-         or (c.kind = 'group' and exists (
-              select 1 from group_members gm where gm.group_id = c.group_id and gm.people_id = ${me.id}
-            ))
-      order by case c.kind when 'church' then 0 when 'age' then 1 when 'team' then 2 else 3 end, c.name
-    `;
-    return rows as Channel[];
-  });
-
-export const listMessages = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .validator((channelId: number) => channelId)
-  .handler(async ({ context, data: channelId }) => {
-    await loadMe(context.userId);
-    const sql = await getSql();
-    const rows = await sql<{
-      id: number;
-      channel_id: number;
-      user_id: string;
-      author_name: string;
-      body: string;
-      created_at: string;
-    }>`
-      select * from messages where channel_id = ${channelId} order by created_at asc limit 200
-    `;
-    return rows.map(
-      (m): ChatMessage => ({
-        id: m.id,
-        channelId: m.channel_id,
-        userId: m.user_id,
-        authorName: m.author_name,
-        body: m.body,
-        createdAt: m.created_at,
-      }),
-    );
-  });
-
-export const sendMessage = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((d: { channelId: number; body: string }) => d)
-  .handler(async ({ context, data }) => {
-    const me = await loadMe(context.userId);
-    const body = data.body.trim().slice(0, 2000);
-    if (!body) return { ok: false as const };
-    const sql = await getSql();
-    await sql`
-      insert into messages (channel_id, user_id, author_name, body)
-      values (${data.channelId}, ${context.userId}, ${me.displayName}, ${body})
-    `;
-    return { ok: true as const };
-  });
 
 export const listResources = createServerFn({ method: "GET" })
   .middleware([authMiddleware])

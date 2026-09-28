@@ -2,6 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { createServerFn } from "@tanstack/react-start";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { BrandingProvider } from "@/lib/church/branding-context";
 import { APP_NAME, CHURCH_CITY, CHURCH_TAGLINE } from "@/lib/church/types";
 import appCss from "../styles.css?url";
 
@@ -56,7 +57,9 @@ function Root() {
       <body className="bg-bg text-fg">
         <PreviewHostBridge />
         <AuthProvider>
-          <Outlet />
+          <BrandingProvider>
+            <Outlet />
+          </BrandingProvider>
         </AuthProvider>
         <Scripts />
       </body>

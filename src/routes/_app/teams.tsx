@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Trash2 } from "lucide-react";
 import {
   assignRosterSlot,
+  createTeam,
+  deleteTeam,
   joinTeam,
   listAvailability,
   listEvents,
@@ -9,12 +12,17 @@ import {
   listTeams,
   removeRosterSlot,
   setAvailability,
+  updateTeam,
 } from "@/lib/church/api";
 import type { ChurchEvent, Team } from "@/lib/church/types";
 import { useMe } from "@/lib/church/me-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_app/teams")({ component: TeamsPage });
 
@@ -37,6 +45,9 @@ function TeamsPage() {
   const me = useMe();
   const [teams, setTeams] = useState<Team[]>([]);
   const [panel, setPanel] = useState<Panel>(null);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Team | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   function reload() {
     listTeams().then(setTeams);
@@ -47,12 +58,24 @@ function TeamsPage() {
     setPanel((cur) => (cur?.teamId === teamId && cur.mode === mode ? null : { teamId, mode }));
   }
 
+  async function onDelete(id: number) {
+    if (!window.confirm("Delete this team? This can't be undone.")) return;
+    setDeletingId(id);
+    try {
+      await deleteTeam({ data: id });
+      reload();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         kicker="Serve"
         title="Teams"
         description="Say when you can serve. Leads see the calendar; the Sunday roster is built from it."
+        actions={me.isStaff ? <Button onClick={() => setOpen(true)}>New team</Button> : null}
       />
       <div className="space-y-4">
         {teams.map((t) => {
@@ -95,6 +118,22 @@ function TeamsPage() {
                       {panel?.teamId === t.id && panel.mode === "roster" ? "Hide roster" : "Build roster"}
                     </Button>
                   ) : null}
+                  {me.isStaff ? (
+                    <>
+                      <Button variant="outline" onClick={() => setEditing(t)}>
+                        Edit
+                      </Button>
+                      <button
+                        type="button"
+                        title="Delete team"
+                        disabled={deletingId === t.id}
+                        onClick={() => onDelete(t.id)}
+                        className="grid size-9 shrink-0 place-items-center rounded-md text-muted transition hover:bg-destructive hover:text-white"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
               {panel?.teamId === t.id && panel.mode === "availability" && t.mine ? (
@@ -107,7 +146,90 @@ function TeamsPage() {
           );
         })}
       </div>
+
+      <TeamDialog
+        open={open || editing !== null}
+        team={editing}
+        onOpenChange={(v) => {
+          if (!v) {
+            setOpen(false);
+            setEditing(null);
+          }
+        }}
+        onSaved={() => {
+          setOpen(false);
+          setEditing(null);
+          reload();
+        }}
+      />
     </div>
+  );
+}
+
+function TeamDialog({
+  open,
+  team,
+  onOpenChange,
+  onSaved,
+}: {
+  open: boolean;
+  team: Team | null;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBusy(true);
+    setError(null);
+    try {
+      const data = {
+        name: String(fd.get("name")),
+        description: String(fd.get("description") || ""),
+        ministry: String(fd.get("ministry") || ""),
+      };
+      if (team) {
+        await updateTeam({ data: { teamId: team.id, ...data } });
+      } else {
+        await createTeam({ data });
+      }
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save team");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{team ? "Edit team" : "New team"}</DialogTitle>
+        </DialogHeader>
+        <form className="space-y-3" onSubmit={onSubmit} key={team?.id ?? "new"}>
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" name="name" defaultValue={team?.name} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ministry">Ministry</Label>
+            <Input id="ministry" name="ministry" defaultValue={team?.ministry} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Textarea id="description" name="description" defaultValue={team?.description} />
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? "Saving…" : team ? "Save team" : "Add team"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

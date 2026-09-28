@@ -3,7 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Baby, HeartHandshake, Users } from "lucide-react";
 import { getHome } from "@/lib/church/api";
 import { useMe } from "@/lib/church/me-context";
-import { CHURCH_NAME, imageSrc, eventImageSrc, type ChurchEvent, type Sermon } from "@/lib/church/types";
+import { useBranding } from "@/lib/church/branding-context";
+import { imageSrc, eventImageSrc, type ChurchEvent, type Sermon } from "@/lib/church/types";
 import { formatMoney, formatWhen } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/_app/home")({ component: HomePage });
 
 function HomePage() {
   const user = useCurrentUser();
+  const branding = useBranding();
   const fallback = useMe();
   const [me, setMe] = useState(fallback);
   const [events, setEvents] = useState<ChurchEvent[]>([]);
@@ -38,7 +40,7 @@ function HomePage() {
   return (
     <div>
       <PageHeader
-        kicker={CHURCH_NAME}
+        kicker={branding.name}
         title={`${hello}, ${me.firstName}.`}
         description={
           me.role === "pastor"

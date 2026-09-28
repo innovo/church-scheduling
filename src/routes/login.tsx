@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NovaMark } from "@/components/nova-mark";
-import { APP_NAME, CHURCH_NAME, CHURCH_TAGLINE } from "@/lib/church/types";
+import { useBranding } from "@/lib/church/branding-context";
+import { APP_NAME } from "@/lib/church/types";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
 function Login() {
   const { user, isPending } = useCurrentUserState();
+  const branding = useBranding();
   const [mode, setMode] = useState<"in" | "up" | "reset">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -86,7 +88,7 @@ function Login() {
           <div>
             <p className="text-sm tracking-[0.18em] uppercase opacity-80">Welcome home</p>
             <h1 className="mt-2 font-display text-5xl leading-[1.05] font-medium">
-              {CHURCH_TAGLINE}
+              {branding.tagline}
             </h1>
           </div>
         </div>
@@ -104,7 +106,7 @@ function Login() {
           <p className="mt-2 text-sm text-muted">
             {mode === "reset"
               ? "Enter your email and we'll send a reset link."
-              : `Members, volunteers, and staff of ${CHURCH_NAME}.`}
+              : `Members, volunteers, and staff of ${branding.name}.`}
           </p>
 
           {isPending ? <div className="mt-8 h-11 animate-pulse rounded-md bg-bg-warm" /> : null}

@@ -97,6 +97,16 @@ export function eventImageSrc(ev: { imageUrl?: string | null; imageKey: string }
   return ev.imageUrl || imageSrc(ev.imageKey);
 }
 
+export type Branding = {
+  name: string;
+  tagline: string;
+  address: string;
+  email: string;
+  phone: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+};
+
 export type Person = {
   id: number;
   userId: string | null;
@@ -117,6 +127,7 @@ export type Person = {
   avatarUrl: string | null;
   status: "pending" | "approved" | "declined";
   isAdmin: boolean;
+  isTenantAdmin: boolean;
 };
 
 export type Me = Person & {
@@ -163,6 +174,7 @@ export type Sermon = {
   description: string;
   imageKey: string;
   transcript: string;
+  audioUrl: string | null;
 };
 
 export type Team = {
@@ -187,20 +199,6 @@ export type Group = {
   mine: boolean;
 };
 
-export type Channel = {
-  id: number;
-  name: string;
-  kind: string;
-};
-
-export type ChatMessage = {
-  id: number;
-  channelId: number;
-  userId: string;
-  authorName: string;
-  body: string;
-  createdAt: string;
-};
 
 export type Resource = {
   id: number;

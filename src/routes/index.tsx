@@ -2,14 +2,10 @@ import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { ArrowRight, MapPin, Clock, Mail, Phone } from "lucide-react";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { publicHappenings } from "@/lib/church/public-content";
+import { useBranding } from "@/lib/church/branding-context";
 import {
-  CHURCH_ADDRESS,
   CHURCH_CITY,
-  CHURCH_EMAIL,
   CHURCH_MAP,
-  CHURCH_NAME,
-  CHURCH_PHONE,
-  CHURCH_TAGLINE,
   CHURCH_VISION,
   CHURCH_WEBSITE,
   CORE_VALUES,
@@ -25,6 +21,7 @@ export const Route = createFileRoute("/")({ component: Landing });
 
 function Landing() {
   const { user, isPending } = useCurrentUserState();
+  const branding = useBranding();
   const { events, sermon } = publicHappenings();
 
   if (!isPending && user) return <Navigate to="/home" />;
@@ -36,7 +33,7 @@ function Landing() {
           <span className="grid size-9 place-items-center rounded-md bg-white shadow-sm ring-1 ring-black/5">
             <NovaMark />
           </span>
-          <span className="font-display text-xl leading-none">{CHURCH_NAME}</span>
+          <span className="font-display text-xl leading-none">{branding.name}</span>
         </Link>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
@@ -58,7 +55,7 @@ function Landing() {
         <div className="relative flex h-[28rem] flex-col justify-end p-6 text-primary-fg sm:h-[36rem] sm:p-10">
           <p className="text-xs tracking-[0.22em] uppercase opacity-80">Join us this Sunday</p>
           <h1 className="mt-2 max-w-2xl font-display text-4xl leading-[1.05] font-medium sm:text-6xl">
-            {CHURCH_TAGLINE}
+            {branding.tagline}
           </h1>
           <p className="mt-3 max-w-lg text-sm text-primary-fg/85 sm:text-base">
             An Awake house in {CHURCH_CITY}, worshipping together, growing together, and reaching the
@@ -83,7 +80,7 @@ function Landing() {
           title={SUNDAY_TIME}
           body="Join us every Sunday for worship, prayer, and the Word."
         />
-        <Fact kicker="Find us" title={CHURCH_CITY} body={CHURCH_ADDRESS} />
+        <Fact kicker="Find us" title={CHURCH_CITY} body={branding.address} />
         <Fact
           kicker="Kids"
           title="Especially welcome"
@@ -97,7 +94,7 @@ function Landing() {
           An Awake house, reaching the nations.
         </h2>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-          {CHURCH_NAME} is a growing community devoted to worship, prayer, and making disciples of all
+          {branding.name} is a growing community devoted to worship, prayer, and making disciples of all
           nations. Whatever your background, you are welcome to come as you are and join us as we seek to
           awaken the nations to the presence and power of God.
         </p>
@@ -164,24 +161,24 @@ function Landing() {
         >
           <MapPin className="size-4 text-primary" />
           <h3 className="mt-3 font-display text-xl font-medium">Find us</h3>
-          <p className="mt-1 text-sm text-muted">{CHURCH_ADDRESS}</p>
+          <p className="mt-1 text-sm text-muted">{branding.address}</p>
         </a>
-        <a href={`tel:${CHURCH_PHONE.replace(/\s+/g, "")}`} className="rounded-xl bg-surface p-5 shadow-[var(--shadow-card)]">
+        <a href={`tel:${branding.phone.replace(/\s+/g, "")}`} className="rounded-xl bg-surface p-5 shadow-[var(--shadow-card)]">
           <Phone className="size-4 text-primary" />
           <h3 className="mt-3 font-display text-xl font-medium">Call us</h3>
-          <p className="mt-1 text-sm text-muted">{CHURCH_PHONE}</p>
+          <p className="mt-1 text-sm text-muted">{branding.phone}</p>
         </a>
-        <a href={`mailto:${CHURCH_EMAIL}`} className="rounded-xl bg-surface p-5 shadow-[var(--shadow-card)]">
+        <a href={`mailto:${branding.email}`} className="rounded-xl bg-surface p-5 shadow-[var(--shadow-card)]">
           <Mail className="size-4 text-primary" />
           <h3 className="mt-3 font-display text-xl font-medium">Say hello</h3>
-          <p className="mt-1 text-sm text-muted">{CHURCH_EMAIL}</p>
+          <p className="mt-1 text-sm text-muted">{branding.email}</p>
         </a>
       </section>
 
       <footer className="border-t border-border px-5 py-10 text-sm text-muted md:px-10">
-        <p className="font-display text-lg text-fg">{CHURCH_NAME}</p>
+        <p className="font-display text-lg text-fg">{branding.name}</p>
         <p className="mt-1">
-          {CHURCH_ADDRESS} · {CHURCH_CITY}
+          {branding.address} · {CHURCH_CITY}
         </p>
         <p className="mt-3">Sundays at {SUNDAY_TIME}</p>
         <p className="mt-3">
@@ -189,8 +186,8 @@ function Landing() {
             {CHURCH_WEBSITE.replace(/^https?:\/\//, "").replace(/\/$/, "")}
           </a>
           {" · "}
-          <a href={`mailto:${CHURCH_EMAIL}`} className="hover:text-fg">
-            {CHURCH_EMAIL}
+          <a href={`mailto:${branding.email}`} className="hover:text-fg">
+            {branding.email}
           </a>
         </p>
       </footer>

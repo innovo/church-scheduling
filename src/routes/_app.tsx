@@ -3,7 +3,8 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { getMe } from "@/lib/church/api";
 import { MeContext } from "@/lib/church/me-context";
-import { CHURCH_NAME, CHURCH_LEADERSHIP } from "@/lib/church/types";
+import { useBranding } from "@/lib/church/branding-context";
+import { CHURCH_LEADERSHIP } from "@/lib/church/types";
 import type { Me } from "@/lib/church/types";
 import { AppShell, AuthGate } from "@/components/app-shell";
 import { NovaMark } from "@/components/nova-mark";
@@ -22,6 +23,7 @@ function AppLayout() {
 
 function ChurchFrame() {
   const { user } = useCurrentUserState();
+  const branding = useBranding();
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +63,7 @@ function ChurchFrame() {
           <h1 className="mt-5 font-display text-2xl font-medium">Almost there, {me.firstName}.</h1>
           <p className="mt-2 text-sm text-muted">
             Your account is waiting for approval from {CHURCH_LEADERSHIP[0]?.name ?? "a pastor"} or an admin at{" "}
-            {CHURCH_NAME}. We'll let you in as soon as it's approved, no need to sign up again.
+            {branding.name}. We'll let you in as soon as it's approved, no need to sign up again.
           </p>
           <Button variant="outline" className="mt-6" onClick={() => signOut("/")}>
             Sign out
@@ -77,7 +79,7 @@ function ChurchFrame() {
         <div className="max-w-sm text-center">
           <h1 className="font-display text-2xl font-medium">Account not approved</h1>
           <p className="mt-2 text-sm text-muted">
-            Reach out to {CHURCH_LEADERSHIP[0]?.name ?? "a pastor"} at {CHURCH_NAME} if you think this is a mistake.
+            Reach out to {CHURCH_LEADERSHIP[0]?.name ?? "a pastor"} at {branding.name} if you think this is a mistake.
           </p>
           <Button variant="outline" className="mt-6" onClick={() => signOut("/")}>
             Sign out
